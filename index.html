@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>CÓDIGOS</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.14.1/mqtt.min.js"></script>
+<style>
+  :root{
+    --bg:#0f1226; --bg2:#171a35; --card:#1e2247; --card2:#262b57;
+    --accent:#6c8cff; --accent2:#4cd7c4; --gold:#ffcf5c; --text:#eef1ff;
+    --muted:#9aa3d0; --danger:#ff6b8a; --line:#333870;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+    background:radial-gradient(1200px 800px at 50% -10%,#22285a 0%,var(--bg) 55%);
+    color:var(--text); min-height:100vh; display:flex; align-items:center;
+    justify-content:center; padding:16px; overscroll-behavior:none;
+  }
+  .app{width:100%;max-width:480px;}
+  .card{
+    background:linear-gradient(180deg,var(--card) 0%,var(--bg2) 100%);
+    border:1px solid var(--line); border-radius:22px; padding:24px 20px;
+    box-shadow:0 24px 60px rgba(0,0,0,.45); position:relative;
+  }
+  h1{font-size:25px;margin:0 0 4px;text-align:center;letter-spacing:.5px;}
+  h1 .em{color:var(--accent2);}
+  .subtitle{text-align:center;color:var(--muted);font-size:14px;margin:0 0 18px;}
+  .phase-title{font-size:20px;margin:0 0 6px;text-align:center;}
+  .phase-sub{color:var(--muted);font-size:14px;text-align:center;margin:0 0 18px;line-height:1.5;}
+  .digits{display:flex;gap:12px;justify-content:center;margin:16px 0 6px;}
+  .digit{
+    width:58px;height:70px;border-radius:16px;background:var(--card2);
+    border:2px solid var(--line);display:flex;align-items:center;justify-content:center;
+    font-size:32px;font-weight:700;transition:.15s;
+  }
+  .digit.filled{border-color:var(--accent);background:#2b3168;}
+  .digit.active{border-color:var(--accent2);box-shadow:0 0 0 3px rgba(76,215,196,.25);}
+  .digit.secret{color:var(--muted);}
+  .keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:18px 0 4px;}
+  .key{
+    padding:15px 0;font-size:21px;font-weight:700;border:none;border-radius:14px;
+    background:var(--card2);color:var(--text);cursor:pointer;transition:.12s;user-select:none;
+  }
+  .key:active{transform:scale(.95);}
+  .key.del{background:#3a2140;color:#ffb0c4;}
+  .key.ok{background:linear-gradient(180deg,var(--accent) 0%,#4a6bff 100%);color:#fff;}
+  .msg{min-height:20px;text-align:center;font-size:14px;margin:8px 0 0;color:var(--danger);}
+  .btn{
+    display:block;width:100%;padding:15px;font-size:16px;font-weight:700;border:none;
+    border-radius:16px;background:linear-gradient(180deg,var(--accent) 0%,#4a6bff 100%);
+    color:#fff;cursor:pointer;margin-top:14px;transition:.12s;
+  }
+  .btn:active{transform:scale(.98);}
+  .btn.secondary{background:var(--card2);color:var(--text);border:1px solid var(--line);}
+  .btn.gold{background:linear-gradient(180deg,var(--gold) 0%,#f5b73c 100%);color:#3a2a00;}
+  .btn:disabled{opacity:.45;}
+  .field{
+    width:100%;padding:14px 16px;font-size:16px;border-radius:14px;border:2px solid var(--line);
+    background:var(--card2);color:var(--text);margin-bottom:4px;text-align:center;
+  }
+  .field:focus{outline:none;border-color:var(--accent);}
+  .field.code{font-size:26px;letter-spacing:8px;font-weight:800;text-transform:uppercase;}
+  label.lbl{display:block;font-size:13px;color:var(--muted);margin:12px 2px 6px;text-align:center;}
+  .rules{
+    background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:15px 17px;
+    font-size:14px;color:var(--muted);line-height:1.7;margin-bottom:4px;
+  }
+  .rules b{color:var(--text);}
+  .status{
+    display:flex;align-items:center;gap:7px;justify-content:center;font-size:12px;
+    color:var(--muted);margin-top:14px;
+  }
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--muted);}
+  .dot.on{background:#4cd7c4;box-shadow:0 0 8px #4cd7c4;}
+  .dot.off{background:var(--danger);}
+  .dot.wait{background:var(--gold);animation:pulse 1s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+  .codebox{
+    text-align:center;background:var(--card2);border:2px dashed var(--accent);border-radius:16px;
+    padding:16px;margin:14px 0;
+  }
+  .codebox .code{font-size:40px;font-weight:800;letter-spacing:10px;color:var(--gold);}
+  .codebox .lab{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:2px;}
+  .turnbar{
+    display:flex;align-items:center;justify-content:space-between;background:var(--card2);
+    border:1px solid var(--line);border-radius:14px;padding:11px 15px;margin-bottom:14px;font-size:14px;
+  }
+  .turnbar .name{font-weight:700;color:var(--accent2);}
+  .badge{font-size:12px;padding:4px 10px;border-radius:20px;font-weight:700;}
+  .badge.you{background:#2b3168;color:var(--accent2);}
+  .badge.wait{background:#3a3320;color:var(--gold);}
+  .history{margin-top:16px;max-height:210px;overflow-y:auto;}
+  .history h3{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:0 0 9px;font-weight:600;}
+  .hrow{display:flex;align-items:center;justify-content:space-between;background:var(--card2);border-radius:12px;padding:9px 13px;margin-bottom:7px;}
+  .hrow .g{font-size:21px;font-weight:700;letter-spacing:5px;font-family:'SF Mono',Menlo,monospace;}
+  .hrow .hits{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:7px;}
+  .pill{background:#2b3168;color:var(--accent2);font-weight:800;border-radius:20px;padding:4px 11px;font-size:14px;}
+  .pill.win{background:var(--gold);color:#3a2a00;}
+  .pill.zero{color:var(--muted);}
+  .empty{color:var(--muted);font-size:13px;text-align:center;padding:14px 0;}
+  .handoff{text-align:center;padding:8px 0;}
+  .handoff .icon{font-size:50px;margin-bottom:4px;}
+  .handoff .who{color:var(--accent2);font-size:28px;font-weight:800;margin:6px 0 12px;}
+  .end{text-align:center;}
+  .end .emoji{font-size:60px;margin-bottom:6px;}
+  .end .big{font-size:28px;font-weight:800;margin:4px 0;}
+  .end .win{color:var(--gold);}
+  .end .lose{color:var(--danger);}
+  .reveal{background:var(--card2);border-radius:14px;padding:15px;margin:14px 0;color:var(--muted);font-size:14px;line-height:1.9;}
+  .reveal b{color:var(--text);font-size:20px;letter-spacing:3px;font-family:'SF Mono',Menlo,monospace;}
+  .flash-overlay{position:fixed;inset:0;background:var(--gold);opacity:0;pointer-events:none;z-index:999;transition:opacity .08s;}
+  .flash-overlay.go{opacity:.85;}
+  .fade{animation:fade .3s ease;}
+  @keyframes fade{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+  .hint{font-size:12px;color:var(--muted);text-align:center;margin-top:10px;line-height:1.5;}
+  a{color:var(--accent2);}
+</style>
+</head>
+<body>
+<div class="flash-overlay" id="flash"></div>
+<div class="app"><div class="card fade" id="screen"></div></div>
+
+<script>
+"use strict";
+
+// ================= Configuración de red =================
+const BROKER = "wss://broker.emqx.io:8084/mqtt";      // broker público, sin cuenta
+const BROKER_FALLBACK = "wss://broker.hivemq.com:8884/mqtt";
+const TOPIC_ROOT = "adivinacifra/v2";
+
+// ================= Estado =================
+const S = {
+  name: "",
+  cid: "c" + Math.floor(performance.now() * 1000 % 1e9) + "_" + (performance.now() | 0),
+  role: null,            // "host" | "guest"
+  room: null,
+  secret: null,
+  buffer: "",
+  phase: "welcome",
+  myTurn: false,
+  guesses: [],           // {guess, hits} — mis intentos sobre el rival
+  opp: { name: null, ready: false, present: false },
+  ready: false,
+  client: null,
+  connected: false,
+  waitingResult: false,
+  usedFallback: false
+};
+
+const screen = document.getElementById("screen");
+const flash = document.getElementById("flash");
+
+// ================= Lógica =================
+function isValid(str){ return /^\d{4}$/.test(str) && new Set(str.split("")).size === 4; }
+function exactHits(guess, secret){ let h=0; for(let i=0;i<4;i++) if(guess[i]===secret[i]) h++; return h; }
+function randCode(){
+  const A = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // sin caracteres ambiguos
+  let c=""; for(let i=0;i<4;i++) c += A[Math.floor((performance.now()*7919*(i+3)) % A.length)];
+  return c;
+}
+
+// ================= Audio + aviso =================
+let audioCtx = null;
+function unlockAudio(){
+  try{
+    if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    if(audioCtx.state === "suspended") audioCtx.resume();
+    // buffer silencioso para desbloquear en iOS
+    const b = audioCtx.createBuffer(1,1,22050);
+    const s = audioCtx.createBufferSource(); s.buffer=b; s.connect(audioCtx.destination); s.start(0);
+  }catch(e){}
+}
+function beep(freq, start, dur, vol){
+  if(!audioCtx) return;
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.type = "square"; o.frequency.value = freq;
+  g.gain.setValueAtTime(0.0001, audioCtx.currentTime+start);
+  g.gain.exponentialRampToValueAtTime(vol, audioCtx.currentTime+start+0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime+start+dur);
+  o.connect(g); g.connect(audioCtx.destination);
+  o.start(audioCtx.currentTime+start); o.stop(audioCtx.currentTime+start+dur+0.02);
+}
+// Aviso en el móvil del RIVAL cuando le aciertan dígitos (hits>0)
+function alertHit(hits, win){
+  // Vibración (Android; iOS la ignora)
+  try{
+    if(navigator.vibrate){
+      if(win) navigator.vibrate([120,60,120,60,300]);
+      else navigator.vibrate(Array(hits).fill(90).flatMap(v=>[v,70]));
+    }
+  }catch(e){}
+  // Sonido
+  if(win){
+    beep(660,0,.15,.5); beep(880,.18,.15,.5); beep(1046,.36,.3,.5);
+    beep(660,.7,.15,.5); beep(1046,.9,.4,.5);
+  } else {
+    for(let i=0;i<hits;i++){ beep(720+i*120, i*0.22, .16, .5); }
+  }
+  // Destello
+  let flashes = win ? 6 : hits;
+  let n=0;
+  const doFlash = ()=>{
+    flash.classList.add("go");
+    setTimeout(()=>{ flash.classList.remove("go"); n++; if(n<flashes) setTimeout(doFlash,120); }, 120);
+  };
+  doFlash();
+}
+
+// ================= MQTT =================
+function topics(room){
+  return {
+    presence: TOPIC_ROOT + "/" + room + "/p/",   // + cid (retenido)
+    events:   TOPIC_ROOT + "/" + room + "/e"
+  };
+}
+function connect(room, onReady){
+  const t = topics(room);
+  const willTopic = t.presence + S.cid;
+  const url = S.usedFallback ? BROKER_FALLBACK : BROKER;
+  const client = mqtt.connect(url, {
+    clientId: "juego_" + S.cid,
+    clean: true,
+    reconnectPeriod: 2500,
+    connectTimeout: 8000,
+    keepalive: 30,
+    will: { topic: willTopic, payload: "", qos:0, retain:true }
+  });
+  S.client = client;
+
+  let firstConnect = true;
+  client.on("connect", ()=>{
+    S.connected = true;
+    client.subscribe(t.presence + "+", {qos:0});
+    client.subscribe(t.events, {qos:0});
+    publishPresence();
+    if(firstConnect){ firstConnect=false; onReady && onReady(); }
+    refreshStatus();
+  });
+  client.on("reconnect", ()=>{ refreshStatus(); });
+  client.on("close", ()=>{ S.connected=false; refreshStatus(); });
+  client.on("error", (err)=>{
+    // Si el broker principal falla al conectar por primera vez, probar el de respaldo
+    if(firstConnect && !S.usedFallback){
+      S.usedFallback = true;
+      try{ client.end(true); }catch(e){}
+      connect(room, onReady);
+    }
+  });
+  client.on("message", (topic, payload)=> handleMessage(topic, payload.toString(), t));
+}
+
+function publishPresence(){
+  if(!S.client || !S.connected) return;
+  const t = topics(S.room);
+  const data = JSON.stringify({ cid:S.cid, name:S.name, role:S.role, ready:S.ready });
+  S.client.publish(t.presence + S.cid, data, {qos:0, retain:true});
+}
+function sendEvent(obj){
+  if(!S.client) return;
+  const t = topics(S.room);
+  obj.cid = S.cid;
+  S.client.publish(t.events, JSON.stringify(obj), {qos:0, retain:false});
+}
+function clearPresence(){
+  if(!S.client) return;
+  const t = topics(S.room);
+  S.client.publish(t.presence + S.cid, "", {qos:0, retain:true});
+}
+
+function handleMessage(topic, msg, t){
+  // Presencia
+  if(topic.startsWith(t.presence)){
+    const who = topic.slice(t.presence.length);
+    if(who === S.cid) return;
+    if(!msg){ // rival se fue
+      if(S.opp.present){ S.opp.present=false; S.opp.ready=false; onOppLeft(); }
+      return;
+    }
+    let d; try{ d=JSON.parse(msg); }catch(e){ return; }
+    S.opp.name = d.name || "Rival";
+    S.opp.ready = !!d.ready;
+    S.opp.present = true;
+    // asegurar roles opuestos: si el otro es host, yo soy guest y viceversa (por si ambos crearon)
+    onPresenceUpdate();
+    return;
+  }
+  // Eventos de juego
+  if(topic === t.events){
+    let e; try{ e=JSON.parse(msg); }catch(err){ return; }
+    if(e.cid === S.cid) return; // ignorar los míos
+    onEvent(e);
+  }
+}
+
+// ================= Manejo de presencia / eventos =================
+function onPresenceUpdate(){
+  if(S.phase === "lobby"){
+    if(S.ready && S.opp.present && S.opp.ready){ startPlay(); }
+    else drawLobby();
+  } else if(S.phase === "create-wait"){
+    if(S.opp.present){ // rival entró; pasar a poner secreto
+      goSecret();
+    }
+  }
+}
+function onOppLeft(){
+  if(S.phase === "play" || S.phase === "lobby"){
+    showInfo("Tu rival se desconectó", "Esperando a que "+ (S.opp.name||"tu rival") +" vuelva a la sala… (deja esta pantalla abierta)");
+    S.phase = "lobby-wait-back";
+  }
+}
+function onEvent(e){
+  if(e.t === "guess"){
+    // El rival intenta MI cifra → yo calculo aciertos con MI secreto
+    const hits = exactHits(e.value, S.secret);
+    const win = hits === 4;
+    sendEvent({ t:"result", value:e.value, hits, win });
+    if(hits>0) alertHit(hits, win);   // ¡aviso en mi móvil!
+    if(win){ endGame(false); }        // me descubrieron: pierdo
+    else { S.myTurn = true; if(S.phase==="play") drawPlay(); }
+  }
+  else if(e.t === "result"){
+    // Respuesta a MI intento
+    S.waitingResult = false;
+    S.guesses.push({ guess:e.value, hits:e.hits });
+    if(e.win){ endGame(true); }       // adiviné su cifra: gano
+    else { S.myTurn = false; if(S.phase==="play") drawPlay(); }
+  }
+  else if(e.t === "rematch"){
+    if(S.phase==="end"){ doRematch(true); }
+  }
+}
+
+// ================= Utilidades UI =================
+function digitsRow(value, secret){
+  let html='<div class="digits">';
+  for(let i=0;i<4;i++){
+    const has=i<value.length; let cls="digit";
+    if(has) cls+=" filled";
+    if(i===value.length) cls+=" active";
+    let ch = has ? (secret ? "•" : value[i]) : "";
+    html+=`<div class="${cls}${secret?' secret':''}">${ch}</div>`;
+  }
+  return html+'</div>';
+}
+function keypad(){
+  let h='<div class="keypad">';
+  for(let n=1;n<=9;n++) h+=`<button class="key" data-n="${n}">${n}</button>`;
+  h+=`<button class="key del" data-act="del">⌫</button>`;
+  h+=`<button class="key" data-n="0">0</button>`;
+  h+=`<button class="key ok" data-act="ok">✓</button>`;
+  return h+'</div>';
+}
+function statusBar(){
+  let dot="off", txt="Sin conexión";
+  if(S.connected){
+    if(S.opp.present){ dot="on"; txt="Conectado con "+(S.opp.name||"rival"); }
+    else { dot="wait"; txt="Conectado — esperando rival"; }
+  } else { dot="wait"; txt="Conectando…"; }
+  return `<div class="status"><span class="dot ${dot}"></span><span id="stxt">${txt}</span></div>`;
+}
+function refreshStatus(){
+  const el = document.getElementById("stxt");
+  if(!el) return;
+  const dot = el.parentElement.querySelector(".dot");
+  let cls="off", txt="Sin conexión";
+  if(S.connected){
+    if(S.opp.present){ cls="on"; txt="Conectado con "+(S.opp.name||"rival"); }
+    else { cls="wait"; txt="Conectado — esperando rival"; }
+  } else { cls="wait"; txt="Conectando…"; }
+  dot.className = "dot "+cls; el.textContent = txt;
+}
+function render(html){
+  screen.classList.remove("fade"); void screen.offsetWidth;
+  screen.innerHTML = html; screen.classList.add("fade");
+}
+function bindKeypad(redraw, onOk){
+  screen.querySelectorAll(".key").forEach(k=>{
+    k.onclick = ()=>{
+      const act=k.dataset.act;
+      if(act==="del"){ S.buffer=S.buffer.slice(0,-1); redraw(); }
+      else if(act==="ok"){ onOk(); }
+      else if(S.buffer.length<4){ S.buffer+=k.dataset.n; redraw(); }
+    };
+  });
+}
+
+// ================= Pantallas =================
+function showWelcome(){
+  S.phase="welcome";
+  render(`
+    <h1>CÓ<span class="em">DIGOS</span></h1>
+    <p class="subtitle">Duelo online · dos jugadores, dos móviles</p>
+    <div class="rules">
+      Cada uno elige en secreto una cifra de <b>4 dígitos sin repetir</b>. Por turnos
+      intentáis adivinar la del rival. La única pista: <b>cuántos dígitos acertaste en su
+      posición exacta</b>. Cuando aciertas, el <b>móvil del rival suena y destella</b>.
+      <b>Gana quien descubra primero la cifra del otro.</b>
+    </div>
+    <button class="btn" id="go">Jugar</button>
+  `);
+  document.getElementById("go").onclick = ()=>{ unlockAudio(); showName(); };
+}
+
+function showName(){
+  S.phase="name";
+  render(`
+    <h2 class="phase-title">¿Cómo te llamas?</h2>
+    <p class="phase-sub">Tu rival verá este nombre.</p>
+    <input class="field" id="nm" maxlength="14" placeholder="Tu nombre" value="${S.name}">
+    <button class="btn" id="go">Continuar</button>
+  `);
+  const nm=document.getElementById("nm"); nm.focus();
+  document.getElementById("go").onclick=()=>{
+    S.name = (nm.value.trim() || "Jugador");
+    showRoom();
+  };
+}
+
+function showRoom(){
+  S.phase="room";
+  render(`
+    <h2 class="phase-title">Sala de juego</h2>
+    <p class="phase-sub">Uno crea la sala y le pasa el código al otro.</p>
+    <button class="btn gold" id="create">🎲 Crear una sala</button>
+    <button class="btn secondary" id="join">🔑 Unirme con un código</button>
+    <p class="hint">Los dos debéis tener esta misma página abierta en vuestro móvil.</p>
+  `);
+  document.getElementById("create").onclick=()=>{ unlockAudio(); createRoom(); };
+  document.getElementById("join").onclick=()=>{ unlockAudio(); joinScreen(); };
+}
+
+function createRoom(){
+  S.role="host"; S.room=randCode(); S.ready=false; S.opp={name:null,ready:false,present:false};
+  S.phase="create-wait";
+  drawCreateWait();
+  connect(S.room, ()=>{ refreshStatus(); });
+}
+function drawCreateWait(){
+  render(`
+    <h2 class="phase-title">Tu sala está lista</h2>
+    <p class="phase-sub">Dile este código a tu rival para que se una:</p>
+    <div class="codebox"><div class="lab">Código de sala</div><div class="code">${S.room}</div></div>
+    <p class="phase-sub">En cuanto entre, elegiréis vuestras cifras secretas.</p>
+    ${statusBar()}
+    <button class="btn secondary" id="cancel">Salir</button>
+  `);
+  document.getElementById("cancel").onclick=leaveToMenu;
+  refreshStatus();
+}
+
+function joinScreen(){
+  S.phase="join";
+  render(`
+    <h2 class="phase-title">Unirse a una sala</h2>
+    <p class="phase-sub">Escribe el código que te pasó tu rival.</p>
+    <input class="field code" id="cd" maxlength="4" placeholder="----" autocapitalize="characters" autocomplete="off">
+    <p class="msg" id="msg"></p>
+    <button class="btn" id="go">Entrar</button>
+    <button class="btn secondary" id="back">Atrás</button>
+  `);
+  const cd=document.getElementById("cd"); cd.focus();
+  cd.addEventListener("input",()=>{ cd.value=cd.value.toUpperCase().replace(/[^A-Z0-9]/g,""); });
+  document.getElementById("go").onclick=()=>{
+    const code=cd.value.trim().toUpperCase();
+    if(code.length<4){ document.getElementById("msg").textContent="El código tiene 4 caracteres."; return; }
+    S.role="guest"; S.room=code; S.ready=false; S.opp={name:null,ready:false,present:false};
+    connect(S.room, ()=>{});
+    goSecret();
+  };
+  document.getElementById("back").onclick=showRoom;
+}
+
+function goSecret(){
+  S.phase="secret"; S.buffer="";
+  drawSecret();
+}
+function drawSecret(){
+  render(`
+    <h2 class="phase-title">Tu cifra secreta</h2>
+    <p class="phase-sub">Elige 4 dígitos <b>sin repetir</b>. El rival no la verá.</p>
+    ${digitsRow(S.buffer)}
+    <p class="msg" id="msg"></p>
+    ${keypad()}
+    ${statusBar()}
+  `);
+  refreshStatus();
+  bindKeypad(drawSecret, submitSecret);
+}
+function submitSecret(){
+  const msg=document.getElementById("msg");
+  if(S.buffer.length<4){ msg.textContent="Faltan dígitos."; return; }
+  if(!isValid(S.buffer)){ msg.textContent="Los 4 dígitos deben ser distintos."; return; }
+  S.secret=S.buffer; S.buffer=""; S.ready=true;
+  publishPresence();
+  S.phase="lobby";
+  drawLobby();
+  onPresenceUpdate();
+}
+function drawLobby(){
+  const oppTxt = S.opp.present
+    ? (S.opp.ready ? `${S.opp.name} está listo ✅` : `${S.opp.name} está eligiendo su cifra…`)
+    : `Esperando a que tu rival entre y elija su cifra…`;
+  render(`
+    <div class="handoff">
+      <div class="icon">⏳</div>
+      <div class="phase-title">¡Listo!</div>
+      <p class="phase-sub">Tu cifra está guardada.<br>${oppTxt}</p>
+    </div>
+    ${statusBar()}
+    <button class="btn secondary" id="cancel">Salir</button>
+  `);
+  refreshStatus();
+  document.getElementById("cancel").onclick=leaveToMenu;
+}
+
+function startPlay(){
+  S.phase="play";
+  S.buffer="";
+  S.myTurn = (S.role==="host");   // el anfitrión empieza (los intentos se resetean en la revancha)
+  drawPlay();
+}
+function drawPlay(){
+  const hist = S.guesses;
+  let historyHtml = hist.length===0
+    ? `<div class="empty">Aún no has hecho intentos.</div>`
+    : hist.slice().reverse().map(h=>`
+        <div class="hrow">
+          <span class="g">${h.guess}</span>
+          <span class="hits">aciertos <span class="pill ${h.hits===4?'win':(h.hits===0?'zero':'')}">${h.hits}/4</span></span>
+        </div>`).join("");
+
+  let center;
+  if(S.myTurn){
+    center = `
+      <p class="phase-sub" style="margin-bottom:4px">Intento #${hist.length+1} — adivina la cifra de <b>${S.opp.name||"tu rival"}</b></p>
+      ${digitsRow(S.buffer)}
+      <p class="msg" id="msg"></p>
+      ${keypad()}`;
+  } else if(S.waitingResult){
+    center = `<div class="handoff"><div class="icon">📡</div><p class="phase-sub">Enviando tu intento…</p></div>`;
+  } else {
+    center = `<div class="handoff"><div class="icon">🕰️</div><p class="phase-sub">Turno de <b>${S.opp.name||"tu rival"}</b>.<br>Está intentando adivinar tu cifra…</p></div>`;
+  }
+
+  render(`
+    <div class="turnbar">
+      <span class="name">${S.name}</span>
+      <span class="badge ${S.myTurn?'you':'wait'}">${S.myTurn?'TU TURNO':'ESPERA'}</span>
+    </div>
+    ${center}
+    <div class="history">
+      <h3>Tus intentos (${hist.length})</h3>
+      ${historyHtml}
+    </div>
+    ${statusBar()}
+  `);
+  refreshStatus();
+  if(S.myTurn) bindKeypad(drawPlay, submitGuess);
+}
+function submitGuess(){
+  const msg=document.getElementById("msg");
+  if(S.buffer.length<4){ msg.textContent="Faltan dígitos."; return; }
+  if(!isValid(S.buffer)){ msg.textContent="Los 4 dígitos deben ser distintos."; return; }
+  const value=S.buffer; S.buffer="";
+  S.waitingResult=true; S.myTurn=false;
+  sendEvent({ t:"guess", value });
+  drawPlay();
+}
+
+function endGame(won){
+  S.phase="end"; S.won=won;
+  drawEnd();
+}
+function drawEnd(){
+  const won=S.won;
+  render(`
+    <div class="end">
+      <div class="emoji">${won?"🏆":"😵"}</div>
+      <div class="big ${won?'win':'lose'}">${won?"¡Ganaste!":"Te descubrieron"}</div>
+      <p class="phase-sub">${won
+        ? `Adivinaste la cifra de ${S.opp.name||"tu rival"} en ${S.guesses.length} ${S.guesses.length===1?'intento':'intentos'}.`
+        : `${S.opp.name||"Tu rival"} descubrió tu cifra primero.`}</p>
+      <div class="reveal">Tu cifra era: <b>${S.secret}</b></div>
+      <button class="btn gold" id="again">Revancha</button>
+      <button class="btn secondary" id="menu">Salir</button>
+    </div>
+    ${statusBar()}
+  `);
+  refreshStatus();
+  document.getElementById("again").onclick=()=>{ sendEvent({t:"rematch"}); doRematch(false); };
+  document.getElementById("menu").onclick=leaveToMenu;
+}
+function doRematch(fromOpponent){
+  S.secret=null; S.buffer=""; S.guesses=[]; S.ready=false; S.won=false;
+  S.waitingResult=false; S.myTurn=false;
+  S.opp.ready=false;
+  publishPresence();
+  goSecret();
+}
+
+function showInfo(title, sub){
+  render(`
+    <div class="handoff">
+      <div class="icon">⚠️</div>
+      <div class="phase-title">${title}</div>
+      <p class="phase-sub">${sub}</p>
+    </div>
+    ${statusBar()}
+    <button class="btn secondary" id="menu">Salir al menú</button>
+  `);
+  refreshStatus();
+  document.getElementById("menu").onclick=leaveToMenu;
+}
+
+function leaveToMenu(){
+  try{ clearPresence(); }catch(e){}
+  try{ if(S.client) S.client.end(true); }catch(e){}
+  S.client=null; S.connected=false; S.role=null; S.room=null; S.secret=null;
+  S.buffer=""; S.guesses=[]; S.ready=false; S.opp={name:null,ready:false,present:false};
+  S.waitingResult=false; S.myTurn=false;
+  showRoom();
+}
+
+// Limpiar presencia al cerrar
+window.addEventListener("beforeunload", ()=>{ try{ clearPresence(); }catch(e){} });
+
+// Teclado físico (para pruebas en ordenador)
+document.addEventListener("keydown",(e)=>{
+  if(S.phase!=="secret" && !(S.phase==="play" && S.myTurn)) return;
+  if(/^[0-9]$/.test(e.key)){ if(S.buffer.length<4){ S.buffer+=e.key; S.phase==="secret"?drawSecret():drawPlay(); } }
+  else if(e.key==="Backspace"){ S.buffer=S.buffer.slice(0,-1); S.phase==="secret"?drawSecret():drawPlay(); }
+  else if(e.key==="Enter"){ S.phase==="secret"?submitSecret():submitGuess(); }
+});
+
+// Arranque
+showWelcome();
+</script>
+</body>
+</html>
