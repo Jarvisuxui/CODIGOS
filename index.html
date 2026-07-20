@@ -5,130 +5,194 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>CÓDIGOS</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.14.1/mqtt.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#0f1226; --bg2:#171a35; --card:#1e2247; --card2:#262b57;
-    --accent:#6c8cff; --accent2:#4cd7c4; --gold:#ffcf5c; --text:#eef1ff;
-    --muted:#9aa3d0; --danger:#ff6b8a; --line:#333870;
+    --gold:#ffd23f; --gold-l:#ffe27a; --gold-d:#b9791a;
+    --teal:#7fe0d0; --text:#eef3ff; --muted:#a9b4e0; --ink:#16204d;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   html,body{margin:0;padding:0;}
   body{
-    font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
-    background:radial-gradient(1200px 800px at 50% -10%,#22285a 0%,var(--bg) 55%);
-    color:var(--text); min-height:100vh; display:flex; align-items:center;
-    justify-content:center; padding:16px; overscroll-behavior:none;
+    font-family:'Baloo 2',system-ui,sans-serif;
+    color:var(--text);
+    background:
+      radial-gradient(130% 55% at 50% -8%, rgba(140,170,255,.45), transparent 62%),
+      linear-gradient(180deg,#31459c 0%,#1a2760 46%,#0e1640 100%);
+    background-attachment:fixed;
+    min-height:100vh; min-height:100dvh;
+    display:flex; justify-content:center; padding:12px; overscroll-behavior:none;
   }
-  .app{width:100%;max-width:480px;}
+  .app{width:100%; max-width:500px; margin:0 auto;}
   .card{
-    background:linear-gradient(180deg,var(--card) 0%,var(--bg2) 100%);
-    border:1px solid var(--line); border-radius:22px; padding:24px 20px;
-    box-shadow:0 24px 60px rgba(0,0,0,.45); position:relative;
+    background:linear-gradient(180deg,#41569f 0%,#2a3a7a 55%,#222f66 100%);
+    border-radius:26px; border:2px solid rgba(255,255,255,.14);
+    box-shadow:
+      inset 0 3px 0 rgba(255,255,255,.22),
+      inset 0 -7px 16px rgba(0,0,0,.32),
+      0 0 0 4px #16204d,
+      0 22px 50px rgba(0,0,0,.6);
+    padding:24px 20px;
+    min-height:calc(100vh - 24px); min-height:calc(100dvh - 24px);
+    display:flex; flex-direction:column; justify-content:center;
   }
-  h1{font-size:25px;margin:0 0 4px;text-align:center;letter-spacing:.5px;}
-  h1 .em{color:var(--accent2);}
-  .subtitle{text-align:center;color:var(--muted);font-size:14px;margin:0 0 18px;}
-  .phase-title{font-size:20px;margin:0 0 6px;text-align:center;}
-  .phase-sub{color:var(--muted);font-size:14px;text-align:center;margin:0 0 18px;line-height:1.5;}
-  .digits{display:flex;gap:12px;justify-content:center;margin:16px 0 6px;}
+  h1{
+    font-family:'Lilita One',cursive; font-size:48px; line-height:1;
+    text-align:center; margin:2px 0 4px; color:var(--gold); letter-spacing:1px;
+    -webkit-text-stroke:2px #101637;
+    text-shadow:0 3px 0 #101637, 0 6px 0 rgba(0,0,0,.32), 0 10px 12px rgba(0,0,0,.42);
+  }
+  h1 .em{color:var(--teal);}
+  .subtitle{text-align:center;color:var(--muted);font-size:14px;margin:0 0 16px;font-weight:600;}
+  .phase-title{font-family:'Lilita One',cursive;font-size:27px;text-align:center;margin:0 0 6px;color:#fff;letter-spacing:.5px;text-shadow:0 2px 0 rgba(0,0,0,.35);}
+  .phase-sub{color:var(--muted);font-size:14.5px;text-align:center;margin:0 0 16px;line-height:1.5;font-weight:500;}
+  .phase-sub b{color:var(--gold-l);}
+
+  /* Slots de dígitos */
+  .digits{display:flex;gap:12px;justify-content:center;margin:18px 0 6px;}
   .digit{
-    width:58px;height:70px;border-radius:16px;background:var(--card2);
-    border:2px solid var(--line);display:flex;align-items:center;justify-content:center;
-    font-size:32px;font-weight:700;transition:.15s;
+    width:62px;height:78px;border-radius:16px;
+    background:linear-gradient(180deg,#131c46,#212a5e);
+    border:3px solid #0e1636;
+    box-shadow:inset 0 5px 12px rgba(0,0,0,.55), inset 0 -2px 0 rgba(255,255,255,.05);
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Lilita One',cursive;font-size:40px;color:var(--gold-l);transition:.12s;
   }
-  .digit.filled{border-color:var(--accent);background:#2b3168;}
-  .digit.active{border-color:var(--accent2);box-shadow:0 0 0 3px rgba(76,215,196,.25);}
-  .digit.secret{color:var(--muted);}
-  .keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:18px 0 4px;}
+  .digit.filled{border-color:var(--gold);box-shadow:inset 0 5px 12px rgba(0,0,0,.5),0 0 0 2px rgba(255,210,63,.22);}
+  .digit.active{border-color:var(--teal);box-shadow:inset 0 5px 12px rgba(0,0,0,.5),0 0 16px rgba(127,224,208,.55);}
+  .digit.secret{color:#8f9bd6;}
+
+  /* Teclado */
+  .keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin:20px 0 4px;}
   .key{
-    padding:15px 0;font-size:21px;font-weight:700;border:none;border-radius:14px;
-    background:var(--card2);color:var(--text);cursor:pointer;transition:.12s;user-select:none;
+    font-family:'Lilita One',cursive;font-size:26px;color:#fff;border:none;border-radius:14px;
+    padding:16px 0;cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(180deg,#4d5cae,#33417f);
+    box-shadow:0 5px 0 #222d61, inset 0 2px 0 rgba(255,255,255,.35);
+    text-shadow:0 2px 0 rgba(0,0,0,.3);transition:transform .06s,box-shadow .06s;
   }
-  .key:active{transform:scale(.95);}
-  .key.del{background:#3a2140;color:#ffb0c4;}
-  .key.ok{background:linear-gradient(180deg,var(--accent) 0%,#4a6bff 100%);color:#fff;}
-  .msg{min-height:20px;text-align:center;font-size:14px;margin:8px 0 0;color:var(--danger);}
+  .key:active{transform:translateY(3px);box-shadow:0 2px 0 #222d61, inset 0 2px 0 rgba(255,255,255,.35);}
+  .key.del{background:linear-gradient(180deg,#ff7688,#e2495f);box-shadow:0 5px 0 #a12b3d, inset 0 2px 0 rgba(255,255,255,.4);}
+  .key.del:active{box-shadow:0 2px 0 #a12b3d, inset 0 2px 0 rgba(255,255,255,.4);}
+  .key.ok{background:linear-gradient(180deg,#9bee57,#63b526);box-shadow:0 5px 0 #3f8a17, inset 0 2px 0 rgba(255,255,255,.4);}
+  .key.ok:active{box-shadow:0 2px 0 #3f8a17, inset 0 2px 0 rgba(255,255,255,.4);}
+
+  .msg{min-height:20px;text-align:center;font-size:14px;margin:8px 0 0;color:#ff9db0;font-weight:700;}
+
+  /* Botones 3D */
   .btn{
-    display:block;width:100%;padding:15px;font-size:16px;font-weight:700;border:none;
-    border-radius:16px;background:linear-gradient(180deg,var(--accent) 0%,#4a6bff 100%);
-    color:#fff;cursor:pointer;margin-top:14px;transition:.12s;
+    font-family:'Lilita One',cursive;letter-spacing:.6px;
+    display:block;width:100%;border:none;border-radius:16px;padding:15px 16px;font-size:20px;
+    color:#fff;cursor:pointer;margin-top:14px;position:relative;
+    background:linear-gradient(180deg,#4aa8ff,#2f86e6);
+    box-shadow:0 6px 0 #1a5cae, 0 10px 16px rgba(0,0,0,.4), inset 0 2px 0 rgba(255,255,255,.55);
+    text-shadow:0 2px 0 rgba(0,0,0,.28);transition:transform .06s,box-shadow .06s;
   }
-  .btn:active{transform:scale(.98);}
-  .btn.secondary{background:var(--card2);color:var(--text);border:1px solid var(--line);}
-  .btn.gold{background:linear-gradient(180deg,var(--gold) 0%,#f5b73c 100%);color:#3a2a00;}
-  .btn:disabled{opacity:.45;}
+  .btn:active{transform:translateY(4px);box-shadow:0 2px 0 #1a5cae, 0 4px 8px rgba(0,0,0,.4), inset 0 2px 0 rgba(255,255,255,.55);}
+  .btn:disabled{opacity:.5;}
+  .btn.gold{background:linear-gradient(180deg,#ffe27a,#f5b325);color:#5c3a06;box-shadow:0 6px 0 #b9791a,0 10px 16px rgba(0,0,0,.4),inset 0 2px 0 rgba(255,255,255,.6);text-shadow:0 1px 0 rgba(255,255,255,.35);}
+  .btn.gold:active{box-shadow:0 2px 0 #b9791a,0 4px 8px rgba(0,0,0,.4),inset 0 2px 0 rgba(255,255,255,.6);}
+  .btn.green{background:linear-gradient(180deg,#9bee57,#63b526);color:#1c3d05;box-shadow:0 6px 0 #3f8a17,0 10px 16px rgba(0,0,0,.4),inset 0 2px 0 rgba(255,255,255,.5);text-shadow:0 1px 0 rgba(255,255,255,.3);}
+  .btn.green:active{box-shadow:0 2px 0 #3f8a17,0 4px 8px rgba(0,0,0,.4),inset 0 2px 0 rgba(255,255,255,.5);}
+  .btn.secondary{background:linear-gradient(180deg,#5a6bb0,#3c4a89);box-shadow:0 6px 0 #27305e,0 10px 16px rgba(0,0,0,.4),inset 0 2px 0 rgba(255,255,255,.4);}
+  .btn.secondary:active{box-shadow:0 2px 0 #27305e,0 4px 8px rgba(0,0,0,.4),inset 0 2px 0 rgba(255,255,255,.4);}
+
+  /* Inputs */
   .field{
-    width:100%;padding:14px 16px;font-size:16px;border-radius:14px;border:2px solid var(--line);
-    background:var(--card2);color:var(--text);margin-bottom:4px;text-align:center;
+    width:100%;padding:14px 16px;font-size:18px;border-radius:14px;border:3px solid #0e1636;
+    background:linear-gradient(180deg,#131c46,#212a5e);color:#fff;margin-bottom:4px;text-align:center;
+    box-shadow:inset 0 4px 10px rgba(0,0,0,.5);font-family:'Baloo 2';font-weight:700;
   }
-  .field:focus{outline:none;border-color:var(--accent);}
-  .field.code{font-size:26px;letter-spacing:8px;font-weight:800;text-transform:uppercase;}
-  label.lbl{display:block;font-size:13px;color:var(--muted);margin:12px 2px 6px;text-align:center;}
+  .field:focus{outline:none;border-color:var(--gold);}
+  .field.code{font-family:'Lilita One';font-size:30px;letter-spacing:10px;color:var(--gold-l);text-transform:uppercase;}
+  label.lbl{display:block;font-size:13px;color:var(--muted);margin:12px 2px 6px;text-align:center;font-weight:700;}
+
   .rules{
-    background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:15px 17px;
-    font-size:14px;color:var(--muted);line-height:1.7;margin-bottom:4px;
+    background:linear-gradient(180deg,#2a3672,#212c5e);border:2px solid rgba(255,255,255,.1);
+    border-radius:16px;padding:15px 17px;font-size:14.5px;color:#c7d0f5;line-height:1.65;
+    box-shadow:inset 0 2px 7px rgba(0,0,0,.3);margin-bottom:4px;font-weight:500;
   }
-  .rules b{color:var(--text);}
-  .status{
-    display:flex;align-items:center;gap:7px;justify-content:center;font-size:12px;
-    color:var(--muted);margin-top:14px;
+  .rules b{color:var(--gold-l);font-weight:800;}
+
+  .invite{
+    background:linear-gradient(180deg,#9bee57,#63b526);color:#173306;border-radius:16px;
+    padding:13px 16px;text-align:center;font-weight:800;margin-bottom:14px;
+    box-shadow:0 5px 0 #3f8a17, inset 0 2px 0 rgba(255,255,255,.4);
   }
+  .invite b{font-family:'Lilita One';letter-spacing:4px;font-size:20px;}
+
+  .status{display:flex;align-items:center;gap:7px;justify-content:center;font-size:12px;color:var(--muted);margin-top:14px;font-weight:600;}
   .dot{width:9px;height:9px;border-radius:50%;background:var(--muted);}
-  .dot.on{background:#4cd7c4;box-shadow:0 0 8px #4cd7c4;}
-  .dot.off{background:var(--danger);}
+  .dot.on{background:#7ee6a0;box-shadow:0 0 8px #7ee6a0;}
+  .dot.off{background:#ff6b8a;}
   .dot.wait{background:var(--gold);animation:pulse 1s infinite;}
   @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+
   .codebox{
-    text-align:center;background:var(--card2);border:2px dashed var(--accent);border-radius:16px;
-    padding:16px;margin:14px 0;
+    text-align:center;border-radius:18px;padding:14px 16px;margin:14px 0;
+    background:linear-gradient(180deg,#2a3672,#1b254c);border:2px dashed var(--gold);
+    box-shadow:inset 0 3px 10px rgba(0,0,0,.4);
   }
-  .codebox .code{font-size:40px;font-weight:800;letter-spacing:10px;color:var(--gold);}
-  .codebox .lab{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:2px;}
+  .codebox .lab{font-size:12px;color:var(--gold);text-transform:uppercase;letter-spacing:3px;font-weight:800;}
+  .codebox .code{font-family:'Lilita One';font-size:52px;letter-spacing:12px;color:#fff;text-shadow:0 3px 0 #101637,0 0 18px rgba(255,210,63,.4);}
+
   .turnbar{
-    display:flex;align-items:center;justify-content:space-between;background:var(--card2);
-    border:1px solid var(--line);border-radius:14px;padding:11px 15px;margin-bottom:14px;font-size:14px;
+    display:flex;align-items:center;justify-content:space-between;border-radius:16px;padding:12px 16px;
+    margin-bottom:14px;background:linear-gradient(180deg,#2a3672,#1f2a58);
+    box-shadow:inset 0 2px 7px rgba(0,0,0,.35);border:2px solid rgba(255,255,255,.08);
   }
-  .turnbar .name{font-weight:700;color:var(--accent2);}
-  .badge{font-size:12px;padding:4px 10px;border-radius:20px;font-weight:700;}
-  .badge.you{background:#2b3168;color:var(--accent2);}
-  .badge.wait{background:#3a3320;color:var(--gold);}
-  .history{margin-top:16px;max-height:210px;overflow-y:auto;}
-  .history h3{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:0 0 9px;font-weight:600;}
-  .hrow{display:flex;align-items:center;justify-content:space-between;background:var(--card2);border-radius:12px;padding:9px 13px;margin-bottom:7px;}
-  .hrow .g{font-size:21px;font-weight:700;letter-spacing:5px;font-family:'SF Mono',Menlo,monospace;}
-  .hrow .hits{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:7px;}
-  .pill{background:#2b3168;color:var(--accent2);font-weight:800;border-radius:20px;padding:4px 11px;font-size:14px;}
-  .pill.win{background:var(--gold);color:#3a2a00;}
-  .pill.zero{color:var(--muted);}
-  .empty{color:var(--muted);font-size:13px;text-align:center;padding:14px 0;}
-  .handoff{text-align:center;padding:8px 0;}
-  .handoff .icon{font-size:50px;margin-bottom:4px;}
-  .handoff .who{color:var(--accent2);font-size:28px;font-weight:800;margin:6px 0 12px;}
+  .turnbar .name{font-family:'Lilita One';font-size:19px;color:var(--teal);}
+  .badge{font-family:'Lilita One';font-size:13px;padding:6px 13px;border-radius:20px;letter-spacing:.5px;}
+  .badge.you{background:linear-gradient(180deg,#9bee57,#63b526);color:#1e3d05;box-shadow:0 3px 0 #3f8a17;}
+  .badge.wait{background:linear-gradient(180deg,#ffe27a,#f5b325);color:#5c3a06;box-shadow:0 3px 0 #b9791a;}
+
+  .history{margin-top:16px;max-height:32vh;overflow-y:auto;}
+  .history h3{font-family:'Lilita One';font-size:13px;color:var(--muted);letter-spacing:1px;margin:0 0 9px;text-transform:uppercase;}
+  .hrow{display:flex;align-items:center;justify-content:space-between;border-radius:12px;padding:10px 13px;margin-bottom:8px;background:linear-gradient(180deg,#2a3672,#212c5e);box-shadow:inset 0 1px 3px rgba(0,0,0,.3);}
+  .hrow .g{font-family:'Lilita One';font-size:23px;letter-spacing:6px;color:#fff;}
+  .hrow .hits{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:7px;font-weight:600;}
+  .pill{font-family:'Lilita One';border-radius:20px;padding:4px 12px;font-size:15px;background:#3a4a8f;color:var(--teal);}
+  .pill.win{background:linear-gradient(180deg,#ffe27a,#f5b325);color:#5c3a06;}
+  .pill.zero{color:#8f9bd6;background:#2a3568;}
+  .empty{color:var(--muted);font-size:13px;text-align:center;padding:14px 0;font-weight:600;}
+
+  .handoff{text-align:center;padding:10px 0;}
+  .handoff .icon{margin-bottom:6px;}
+  .handoff .who{font-family:'Lilita One';color:var(--teal);font-size:30px;margin:6px 0 12px;}
+
   .end{text-align:center;}
-  .end .emoji{font-size:60px;margin-bottom:6px;}
-  .end .big{font-size:28px;font-weight:800;margin:4px 0;}
-  .end .win{color:var(--gold);}
-  .end .lose{color:var(--danger);}
-  .reveal{background:var(--card2);border-radius:14px;padding:15px;margin:14px 0;color:var(--muted);font-size:14px;line-height:1.9;}
-  .reveal b{color:var(--text);font-size:20px;letter-spacing:3px;font-family:'SF Mono',Menlo,monospace;}
+  .end .emoji{margin-bottom:6px;}
+  .end .big{font-family:'Lilita One';font-size:34px;margin:4px 0;}
+  .end .win{color:var(--gold);text-shadow:0 3px 0 #101637;}
+  .end .lose{color:#ff6b8a;text-shadow:0 3px 0 #101637;}
+  .reveal{border-radius:14px;padding:15px;margin:14px 0;color:#c7d0f5;font-size:14px;line-height:1.9;background:linear-gradient(180deg,#2a3672,#212c5e);box-shadow:inset 0 2px 6px rgba(0,0,0,.3);font-weight:500;}
+  .reveal b{font-family:'Lilita One';color:#fff;font-size:24px;letter-spacing:4px;}
+
   .flash-overlay{position:fixed;inset:0;background:var(--gold);opacity:0;pointer-events:none;z-index:999;transition:opacity .08s;}
+  .flash-overlay.go{opacity:.85;}
+
   .toast{
-    position:fixed;top:14px;left:50%;z-index:1000;transform:translateX(-50%) translateY(-200%);
-    max-width:92%;width:max-content;padding:14px 20px;border-radius:14px;font-weight:800;
-    font-size:15px;line-height:1.35;text-align:center;color:#1a1030;pointer-events:none;
-    box-shadow:0 14px 36px rgba(0,0,0,.55);transition:transform .38s cubic-bezier(.2,1.25,.3,1);
+    position:fixed;top:14px;left:50%;z-index:1000;transform:translateX(-50%) translateY(-220%);
+    max-width:92%;width:max-content;padding:14px 20px;border-radius:16px;font-family:'Lilita One';
+    font-size:16px;line-height:1.3;text-align:center;color:#181022;pointer-events:none;
+    box-shadow:0 8px 0 rgba(0,0,0,.22),0 16px 34px rgba(0,0,0,.5);
+    transition:transform .38s cubic-bezier(.2,1.25,.3,1);
   }
   .toast.show{transform:translateX(-50%) translateY(0);}
-  .toast.warn{background:linear-gradient(180deg,#ffd873,#f5b73c);}
+  .toast.warn{background:linear-gradient(180deg,#ffe27a,#f5b325);}
   .toast.crit{background:linear-gradient(180deg,#ff7d98,#e63e64);color:#fff;}
-  .toast.safe{background:linear-gradient(180deg,#5fe0ce,#2bb6a4);}
-  .lasthit{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:9px 13px;margin-top:12px;font-size:13px;color:var(--muted);}
-  .lasthit b{color:var(--gold);}
-  .flash-overlay.go{opacity:.85;}
+  .toast.safe{background:linear-gradient(180deg,#9bee57,#63b526);color:#12300a;}
+
+  .lasthit{border-radius:12px;padding:10px 13px;margin-top:12px;font-size:13.5px;color:#c7d0f5;background:linear-gradient(180deg,#2a3672,#212c5e);box-shadow:inset 0 1px 3px rgba(0,0,0,.3);font-weight:600;}
+  .lasthit b{font-family:'Lilita One';color:var(--gold);}
+
+  .hint{font-size:12.5px;color:var(--muted);text-align:center;margin-top:12px;line-height:1.5;font-weight:600;}
+  .hint b{color:var(--gold-l);font-family:'Lilita One';letter-spacing:2px;}
   .fade{animation:fade .3s ease;}
   @keyframes fade{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
-  .hint{font-size:12px;color:var(--muted);text-align:center;margin-top:10px;line-height:1.5;}
-  a{color:var(--accent2);}
+  a{color:var(--teal);}
 </style>
 </head>
 <body>
@@ -143,6 +207,10 @@
 const BROKER = "wss://broker.emqx.io:8084/mqtt";      // broker público, sin cuenta
 const BROKER_FALLBACK = "wss://broker.hivemq.com:8884/mqtt";
 const TOPIC_ROOT = "adivinacifra/v2";
+
+// Invitación por enlace (?sala=XXXX)
+const INVITE = (()=>{ try{ const p=new URLSearchParams(location.search); return (p.get("sala")||"").toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,4); }catch(e){ return ""; } })();
+function inviteUrl(code){ return location.origin + location.pathname + "?sala=" + code; }
 
 // ================= Estado =================
 const S = {
@@ -160,6 +228,7 @@ const S = {
   client: null,
   connected: false,
   waitingResult: false,
+  oppLastGuess: null,
   usedFallback: false
 };
 
@@ -181,7 +250,6 @@ function unlockAudio(){
   try{
     if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
     if(audioCtx.state === "suspended") audioCtx.resume();
-    // buffer silencioso para desbloquear en iOS
     const b = audioCtx.createBuffer(1,1,22050);
     const s = audioCtx.createBufferSource(); s.buffer=b; s.connect(audioCtx.destination); s.start(0);
   }catch(e){}
@@ -197,32 +265,28 @@ function beep(freq, start, dur, vol){
   o.connect(g); g.connect(audioCtx.destination);
   o.start(audioCtx.currentTime+start); o.stop(audioCtx.currentTime+start+dur+0.02);
 }
-// Aviso en el móvil del RIVAL cuando le aciertan dígitos (hits>0)
+// Aviso en el móvil del RIVAL cuando le aciertan dígitos
 function alertHit(hits, win){
-  // Vibración (Android; iOS la ignora)
   try{
     if(navigator.vibrate){
       if(win) navigator.vibrate([120,60,120,60,300]);
       else navigator.vibrate(Array(hits).fill(90).flatMap(v=>[v,70]));
     }
   }catch(e){}
-  // Sonido
   if(win){
     beep(660,0,.15,.5); beep(880,.18,.15,.5); beep(1046,.36,.3,.5);
     beep(660,.7,.15,.5); beep(1046,.9,.4,.5);
   } else {
     for(let i=0;i<hits;i++){ beep(720+i*120, i*0.22, .16, .5); }
   }
-  // Destello
-  let flashes = win ? 6 : hits;
-  let n=0;
+  let flashes = win ? 6 : hits, n=0;
   const doFlash = ()=>{
     flash.classList.add("go");
     setTimeout(()=>{ flash.classList.remove("go"); n++; if(n<flashes) setTimeout(doFlash,120); }, 120);
   };
   doFlash();
 }
-// Aviso de advertencia en pantalla del RIVAL: cuántos dígitos le has acertado
+// Mensaje de advertencia en pantalla del RIVAL: cuántos dígitos le has acertado
 function showWarn(hits, oppName, win){
   const t = document.getElementById("toast");
   if(!t) return;
@@ -233,35 +297,59 @@ function showWarn(hits, oppName, win){
     cls="safe"; icon="shield"; txt=`${oppName} ha probado y ha fallado — 0 aciertos`;
   } else {
     cls = hits>=3 ? "crit" : "warn"; icon="warning";
-    txt = `¡Cuidado! ${oppName} ha acertado <span style="font-size:19px">${hits}</span> de 4 dígitos`;
+    txt = `¡Cuidado! ${oppName} ha acertado <span style="font-size:20px">${hits}</span> de 4 dígitos`;
   }
   t.className = "toast show " + cls;
   t.innerHTML = `<span style="display:inline-flex;align-items:center;gap:9px;justify-content:center">${ICON(icon,22)}<span>${txt}</span></span>`;
   clearTimeout(t._timer);
   t._timer = setTimeout(()=>{ t.className = "toast"; }, win?4200:3800);
 }
+// Aviso breve (enlace copiado, etc.)
+function miniToast(msg){
+  const t = document.getElementById("toast");
+  if(!t) return;
+  t.className = "toast show safe";
+  t.innerHTML = `<span style="display:inline-flex;align-items:center;gap:9px;justify-content:center">${ICON('check',20)}<span>${msg}</span></span>`;
+  clearTimeout(t._timer);
+  t._timer = setTimeout(()=>{ t.className = "toast"; }, 2200);
+}
+// Compartir / copiar invitación
+async function shareInvite(code){
+  const url = inviteUrl(code);
+  const data = { title:"CÓDIGOS", text:`¡Te reto en CÓDIGOS! Entra a mi sala (${code}):`, url };
+  try{
+    if(navigator.share){ await navigator.share(data); }
+    else { copyText(url); }
+  }catch(e){ /* cancelado por el usuario */ }
+}
+function copyText(txt){
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(()=>miniToast("Enlace copiado")).catch(()=>fallbackCopy(txt));
+  } else { fallbackCopy(txt); }
+}
+function fallbackCopy(txt){
+  try{
+    const ta=document.createElement("textarea"); ta.value=txt;
+    ta.style.position="fixed"; ta.style.opacity="0"; document.body.appendChild(ta);
+    ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
+    miniToast("Enlace copiado");
+  }catch(e){ miniToast("Copia el enlace manualmente"); }
+}
 
 // ================= MQTT =================
 function topics(room){
-  return {
-    presence: TOPIC_ROOT + "/" + room + "/p/",   // + cid (retenido)
-    events:   TOPIC_ROOT + "/" + room + "/e"
-  };
+  return { presence: TOPIC_ROOT + "/" + room + "/p/", events: TOPIC_ROOT + "/" + room + "/e" };
 }
 function connect(room, onReady){
   const t = topics(room);
   const willTopic = t.presence + S.cid;
   const url = S.usedFallback ? BROKER_FALLBACK : BROKER;
   const client = mqtt.connect(url, {
-    clientId: "juego_" + S.cid,
-    clean: true,
-    reconnectPeriod: 2500,
-    connectTimeout: 8000,
-    keepalive: 30,
+    clientId: "juego_" + S.cid, clean: true, reconnectPeriod: 2500,
+    connectTimeout: 8000, keepalive: 30,
     will: { topic: willTopic, payload: "", qos:0, retain:true }
   });
   S.client = client;
-
   let firstConnect = true;
   client.on("connect", ()=>{
     S.connected = true;
@@ -273,8 +361,7 @@ function connect(room, onReady){
   });
   client.on("reconnect", ()=>{ refreshStatus(); });
   client.on("close", ()=>{ S.connected=false; refreshStatus(); });
-  client.on("error", (err)=>{
-    // Si el broker principal falla al conectar por primera vez, probar el de respaldo
+  client.on("error", ()=>{
     if(firstConnect && !S.usedFallback){
       S.usedFallback = true;
       try{ client.end(true); }catch(e){}
@@ -283,7 +370,6 @@ function connect(room, onReady){
   });
   client.on("message", (topic, payload)=> handleMessage(topic, payload.toString(), t));
 }
-
 function publishPresence(){
   if(!S.client || !S.connected) return;
   const t = topics(S.room);
@@ -301,41 +387,32 @@ function clearPresence(){
   const t = topics(S.room);
   S.client.publish(t.presence + S.cid, "", {qos:0, retain:true});
 }
-
 function handleMessage(topic, msg, t){
-  // Presencia
   if(topic.startsWith(t.presence)){
     const who = topic.slice(t.presence.length);
     if(who === S.cid) return;
-    if(!msg){ // rival se fue
-      if(S.opp.present){ S.opp.present=false; S.opp.ready=false; onOppLeft(); }
-      return;
-    }
+    if(!msg){ if(S.opp.present){ S.opp.present=false; S.opp.ready=false; onOppLeft(); } return; }
     let d; try{ d=JSON.parse(msg); }catch(e){ return; }
     S.opp.name = d.name || "Rival";
     S.opp.ready = !!d.ready;
     S.opp.present = true;
-    // asegurar roles opuestos: si el otro es host, yo soy guest y viceversa (por si ambos crearon)
     onPresenceUpdate();
     return;
   }
-  // Eventos de juego
   if(topic === t.events){
     let e; try{ e=JSON.parse(msg); }catch(err){ return; }
-    if(e.cid === S.cid) return; // ignorar los míos
+    if(e.cid === S.cid) return;
     onEvent(e);
   }
 }
 
-// ================= Manejo de presencia / eventos =================
+// ================= Presencia / eventos =================
 function onPresenceUpdate(){
   if(S.phase === "lobby"){
     if(S.ready && S.opp.present && S.opp.ready){ startPlay(); }
     else drawLobby();
   } else if(S.phase === "create-wait"){
-    if(S.opp.present){ // rival entró; pasar a poner secreto
-      goSecret();
-    }
+    if(S.opp.present){ goSecret(); }
   }
 }
 function onOppLeft(){
@@ -346,21 +423,19 @@ function onOppLeft(){
 }
 function onEvent(e){
   if(e.t === "guess"){
-    // El rival intenta MI cifra → yo calculo aciertos con MI secreto
     const hits = exactHits(e.value, S.secret);
     const win = hits === 4;
     sendEvent({ t:"result", value:e.value, hits, win });
     S.oppLastGuess = { value:e.value, hits };
-    if(hits>0) alertHit(hits, win);                 // sonido + destello + vibración
-    showWarn(hits, S.opp.name || "Tu rival", win);  // mensaje de advertencia en pantalla
-    if(win){ endGame(false); }                      // me descubrieron: pierdo
+    if(hits>0) alertHit(hits, win);
+    showWarn(hits, S.opp.name || "Tu rival", win);
+    if(win){ endGame(false); }
     else { S.myTurn = true; if(S.phase==="play") drawPlay(); }
   }
   else if(e.t === "result"){
-    // Respuesta a MI intento
     S.waitingResult = false;
     S.guesses.push({ guess:e.value, hits:e.hits });
-    if(e.win){ endGame(true); }       // adiviné su cifra: gano
+    if(e.win){ endGame(true); }
     else { S.myTurn = false; if(S.phase==="play") drawPlay(); }
   }
   else if(e.t === "rematch"){
@@ -368,7 +443,7 @@ function onEvent(e){
   }
 }
 
-// ================= Iconos (SVG propios, sin emojis) =================
+// ================= Iconos (SVG propios) =================
 function ICON(name, size, color){
   size = size || 24; color = color || "currentColor";
   const head = `width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;flex:none"`;
@@ -385,12 +460,14 @@ function ICON(name, size, color){
     shield:`<path d="M12 3l7.5 3v5c0 5.2-3.3 7.4-7.5 8.4C7.8 18.4 4.5 16.2 4.5 11V6z"/><path d="M8.8 12l2.2 2.2 4.4-4.6"/>`,
     target:`<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.2"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/>`,
     check:`<path d="M4 12.5l5 5L20 6"/>`,
-    back:`<path d="M9 5h9a2 2 0 012 2v10a2 2 0 01-2 2H9l-6-7z"/><path d="M13 9.5l4 4M17 9.5l-4 4"/>`
+    back:`<path d="M9 5h9a2 2 0 012 2v10a2 2 0 01-2 2H9l-6-7z"/><path d="M13 9.5l4 4M17 9.5l-4 4"/>`,
+    share:`<circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8l7.4-4.3M8.3 13.2l7.4 4.3"/>`,
+    link:`<path d="M9 15l6-6"/><path d="M10.5 6.5l1.2-1.2a4 4 0 015.7 5.7l-2.2 2.2"/><path d="M13.5 17.5l-1.2 1.2a4 4 0 01-5.7-5.7l2.2-2.2"/>`
   };
   return `<svg ${head}>${P[name]||""}</svg>`;
 }
 function iconLabel(name, text){
-  return `<span style="display:inline-flex;align-items:center;gap:9px;justify-content:center">${ICON(name,20)}<span>${text}</span></span>`;
+  return `<span style="display:inline-flex;align-items:center;gap:10px;justify-content:center">${ICON(name,22)}<span>${text}</span></span>`;
 }
 
 // ================= Utilidades UI =================
@@ -450,17 +527,19 @@ function bindKeypad(redraw, onOk){
 // ================= Pantallas =================
 function showWelcome(){
   S.phase="welcome";
+  const inviteBanner = INVITE ? `<div class="invite">Te han invitado a la sala <b>${INVITE}</b></div>` : "";
   render(`
-    <div style="text-align:center;margin-bottom:4px">${ICON('target',46,'#4cd7c4')}</div>
+    <div style="text-align:center;margin-bottom:2px">${ICON('target',50,'#7fe0d0')}</div>
     <h1>CÓ<span class="em">DIGOS</span></h1>
     <p class="subtitle">Duelo online · dos jugadores, dos móviles</p>
+    ${inviteBanner}
     <div class="rules">
       Cada uno elige en secreto una cifra de <b>4 dígitos sin repetir</b>. Por turnos
       intentáis adivinar la del rival. La única pista: <b>cuántos dígitos acertaste en su
       posición exacta</b>. Cuando aciertas, el <b>móvil del rival suena y destella</b>.
       <b>Gana quien descubra primero la cifra del otro.</b>
     </div>
-    <button class="btn" id="go">Jugar</button>
+    <button class="btn green" id="go">${INVITE ? "Entrar a la sala" : "Jugar"}</button>
   `);
   document.getElementById("go").onclick = ()=>{ unlockAudio(); showName(); };
 }
@@ -476,7 +555,7 @@ function showName(){
   const nm=document.getElementById("nm"); nm.focus();
   document.getElementById("go").onclick=()=>{
     S.name = (nm.value.trim() || "Jugador");
-    showRoom();
+    if(INVITE){ joinRoom(INVITE); } else { showRoom(); }
   };
 }
 
@@ -484,10 +563,9 @@ function showRoom(){
   S.phase="room";
   render(`
     <h2 class="phase-title">Sala de juego</h2>
-    <p class="phase-sub">Uno crea la sala y le pasa el código al otro.</p>
+    <p class="phase-sub">Crea una sala e invita a tu rival, o únete con un código.</p>
     <button class="btn gold" id="create">${iconLabel('dice','Crear una sala')}</button>
     <button class="btn secondary" id="join">${iconLabel('key','Unirme con un código')}</button>
-    <p class="hint">Los dos debéis tener esta misma página abierta en vuestro móvil.</p>
   `);
   document.getElementById("create").onclick=()=>{ unlockAudio(); createRoom(); };
   document.getElementById("join").onclick=()=>{ unlockAudio(); joinScreen(); };
@@ -500,14 +578,19 @@ function createRoom(){
   connect(S.room, ()=>{ refreshStatus(); });
 }
 function drawCreateWait(){
+  const url = inviteUrl(S.room);
   render(`
-    <h2 class="phase-title">Tu sala está lista</h2>
-    <p class="phase-sub">Dile este código a tu rival para que se una:</p>
+    <h2 class="phase-title">¡Sala creada!</h2>
+    <p class="phase-sub">Invita a tu rival — no tendrá que escribir el código.</p>
     <div class="codebox"><div class="lab">Código de sala</div><div class="code">${S.room}</div></div>
-    <p class="phase-sub">En cuanto entre, elegiréis vuestras cifras secretas.</p>
+    <button class="btn green" id="share">${iconLabel('share','Enviar invitación')}</button>
+    <button class="btn secondary" id="copy">${iconLabel('link','Copiar enlace')}</button>
+    <p class="hint">O dile el código <b>${S.room}</b> para que lo escriba a mano.</p>
     ${statusBar()}
     <button class="btn secondary" id="cancel">Salir</button>
   `);
+  document.getElementById("share").onclick=()=>shareInvite(S.room);
+  document.getElementById("copy").onclick=()=>copyText(url);
   document.getElementById("cancel").onclick=leaveToMenu;
   refreshStatus();
 }
@@ -519,7 +602,7 @@ function joinScreen(){
     <p class="phase-sub">Escribe el código que te pasó tu rival.</p>
     <input class="field code" id="cd" maxlength="4" placeholder="----" autocapitalize="characters" autocomplete="off">
     <p class="msg" id="msg"></p>
-    <button class="btn" id="go">Entrar</button>
+    <button class="btn green" id="go">Entrar</button>
     <button class="btn secondary" id="back">Atrás</button>
   `);
   const cd=document.getElementById("cd"); cd.focus();
@@ -527,17 +610,18 @@ function joinScreen(){
   document.getElementById("go").onclick=()=>{
     const code=cd.value.trim().toUpperCase();
     if(code.length<4){ document.getElementById("msg").textContent="El código tiene 4 caracteres."; return; }
-    S.role="guest"; S.room=code; S.ready=false; S.opp={name:null,ready:false,present:false};
-    connect(S.room, ()=>{});
-    goSecret();
+    joinRoom(code);
   };
   document.getElementById("back").onclick=showRoom;
 }
 
-function goSecret(){
-  S.phase="secret"; S.buffer="";
-  drawSecret();
+function joinRoom(code){
+  S.role="guest"; S.room=code; S.ready=false; S.opp={name:null,ready:false,present:false};
+  connect(S.room, ()=>{});
+  goSecret();
 }
+
+function goSecret(){ S.phase="secret"; S.buffer=""; drawSecret(); }
 function drawSecret(){
   render(`
     <h2 class="phase-title">Tu cifra secreta</h2>
@@ -562,11 +646,11 @@ function submitSecret(){
 }
 function drawLobby(){
   const oppTxt = S.opp.present
-    ? (S.opp.ready ? `${S.opp.name} está listo ${ICON('check',16,'#4cd7c4')}` : `${S.opp.name} está eligiendo su cifra…`)
+    ? (S.opp.ready ? `${S.opp.name} está listo ${ICON('check',16,'#7fe0d0')}` : `${S.opp.name} está eligiendo su cifra…`)
     : `Esperando a que tu rival entre y elija su cifra…`;
   render(`
     <div class="handoff">
-      <div class="icon">${ICON('hourglass',52,'#4cd7c4')}</div>
+      <div class="icon">${ICON('hourglass',54,'#7fe0d0')}</div>
       <div class="phase-title">¡Listo!</div>
       <p class="phase-sub">Tu cifra está guardada.<br>${oppTxt}</p>
     </div>
@@ -578,9 +662,8 @@ function drawLobby(){
 }
 
 function startPlay(){
-  S.phase="play";
-  S.buffer="";
-  S.myTurn = (S.role==="host");   // el anfitrión empieza (los intentos se resetean en la revancha)
+  S.phase="play"; S.buffer="";
+  S.myTurn = (S.role==="host");
   drawPlay();
 }
 function drawPlay(){
@@ -601,12 +684,12 @@ function drawPlay(){
       <p class="msg" id="msg"></p>
       ${keypad()}`;
   } else if(S.waitingResult){
-    center = `<div class="handoff"><div class="icon">${ICON('signal',50,'#6c8cff')}</div><p class="phase-sub">Enviando tu intento…</p></div>`;
+    center = `<div class="handoff"><div class="icon">${ICON('signal',52,'#6c8cff')}</div><p class="phase-sub">Enviando tu intento…</p></div>`;
   } else {
     const last = S.oppLastGuess
       ? `<div class="lasthit">Su último intento acertó <b>${S.oppLastGuess.hits}/4</b> de tus dígitos</div>`
       : "";
-    center = `<div class="handoff"><div class="icon">${ICON('clock',50,'#ffcf5c')}</div><p class="phase-sub">Turno de <b>${S.opp.name||"tu rival"}</b>.<br>Está intentando adivinar tu cifra…</p>${last}</div>`;
+    center = `<div class="handoff"><div class="icon">${ICON('clock',52,'#ffd23f')}</div><p class="phase-sub">Turno de <b>${S.opp.name||"tu rival"}</b>.<br>Está intentando adivinar tu cifra…</p>${last}</div>`;
   }
 
   render(`
@@ -634,15 +717,12 @@ function submitGuess(){
   drawPlay();
 }
 
-function endGame(won){
-  S.phase="end"; S.won=won;
-  drawEnd();
-}
+function endGame(won){ S.phase="end"; S.won=won; drawEnd(); }
 function drawEnd(){
   const won=S.won;
   render(`
     <div class="end">
-      <div class="emoji">${won?ICON('trophy',62,'#ffcf5c'):ICON('unlock',62,'#ff6b8a')}</div>
+      <div class="emoji">${won?ICON('trophy',66,'#ffd23f'):ICON('unlock',66,'#ff6b8a')}</div>
       <div class="big ${won?'win':'lose'}">${won?"¡Ganaste!":"Te descubrieron"}</div>
       <p class="phase-sub">${won
         ? `Adivinaste la cifra de ${S.opp.name||"tu rival"} en ${S.guesses.length} ${S.guesses.length===1?'intento':'intentos'}.`
@@ -668,7 +748,7 @@ function doRematch(fromOpponent){
 function showInfo(title, sub){
   render(`
     <div class="handoff">
-      <div class="icon">${ICON('warning',50,'#ffcf5c')}</div>
+      <div class="icon">${ICON('warning',52,'#ffd23f')}</div>
       <div class="phase-title">${title}</div>
       <p class="phase-sub">${sub}</p>
     </div>
@@ -688,7 +768,6 @@ function leaveToMenu(){
   showRoom();
 }
 
-// Limpiar presencia al cerrar
 window.addEventListener("beforeunload", ()=>{ try{ clearPresence(); }catch(e){} });
 
 // Teclado físico (para pruebas en ordenador)
