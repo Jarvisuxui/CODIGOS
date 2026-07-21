@@ -42,7 +42,7 @@
     text-align:center; margin:2px 0 4px; color:var(--label); letter-spacing:-.02em;
   }
   h1 .em{color:var(--label);}
-  h1 .ch{display:inline-block;min-width:.58em;text-align:center;}
+  h1 .ch{display:inline-block;text-align:center;}
   h1 .ch.num{color:var(--accent);}
   h1 .ch.lock{color:var(--label);}
   h1 .ch.lock.isem{color:var(--label);}
@@ -845,9 +845,14 @@ function animateTitle(){
   const el = document.getElementById("title");
   if(!el) return;
   const target = ["C","Ó","D","I","G","O","S"];
-  const emStart = 2; // a partir de aquí, color magenta (como el "DIGOS")
-  el.innerHTML = target.map((c,i)=>`<span class="ch num${i>=emStart?' isem':''}">0</span>`).join("");
+  const emStart = 2;
+  // 1) Montar con las letras FINALES y fijar el ancho real de cada una:
+  //    así el título ocupa lo mismo durante y después de la animación (sin salto).
+  el.innerHTML = target.map((c,i)=>`<span class="ch lock${i>=emStart?' isem':''}">${c}</span>`).join("");
   const spans = [...el.querySelectorAll(".ch")];
+  spans.forEach(s=>{ s.style.width = s.getBoundingClientRect().width.toFixed(2)+"px"; });
+  // 2) Arrancar el barrido de dígitos dentro de esos anchos fijos
+  spans.forEach(s=>{ s.classList.remove("lock"); s.classList.add("num"); s.textContent="0"; });
   const locked = new Array(target.length).fill(false);
   const scr = setInterval(()=>{
     for(let i=0;i<spans.length;i++){ if(!locked[i]) spans[i].textContent = String((Math.random()*10)|0); }
