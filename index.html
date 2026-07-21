@@ -152,6 +152,13 @@
   .bonus-pop{position:absolute;left:50%;top:-4px;transform:translateX(-50%);font-family:var(--disp);font-weight:800;color:#34c759;font-size:19px;pointer-events:none;white-space:nowrap;animation:bonusUp 1s ease forwards;}
   @keyframes bonusUp{0%{opacity:0;transform:translateX(-50%) translateY(6px) scale(.8);}20%{opacity:1;transform:translateX(-50%) translateY(0) scale(1.1);}100%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(1);}}
 
+  /* Globo en perspectiva */
+  .globe-tilt{display:inline-flex;transform:perspective(70px) rotateX(16deg) rotateY(-14deg);}
+  .globe-3d{display:inline-flex;transform:perspective(200px) rotateX(15deg);}
+  .globe-3d svg{overflow:visible;display:block;}
+  .globe-3d .mer{transform-box:fill-box;transform-origin:center;animation:merSpin 2.6s linear infinite;}
+  @keyframes merSpin{0%{transform:scaleX(1)}50%{transform:scaleX(-1)}100%{transform:scaleX(1)}}
+
   .history{margin-top:16px;max-height:32vh;overflow-y:auto;}
   .history h3{font-family:var(--disp);font-weight:600;font-size:13px;color:var(--label3);letter-spacing:.2px;margin:0 0 9px;text-transform:uppercase;}
   .hrow{display:flex;align-items:center;justify-content:space-between;border-radius:14px;padding:12px 14px;margin-bottom:8px;background:var(--fill);}
@@ -380,13 +387,13 @@ function makeMatchmaker(mm){
 const LOBBY_ROOT = TOPIC_ROOT + "/lobby/";
 function closeLobby(){ try{ if(S.lobby) S.lobby.end(true); }catch(e){} S.lobby=null; }
 function quickMatch(){
-  S.mode="online"; S.quick=true; S.phase="searching";
+  S.mode="online"; S.quick=true; S.phase="searching"; S._mmStarted=false;
   drawSearching("Conectando…");
-  if(typeof mqtt==="undefined"){ drawSearching("No se pudo cargar la red. Reintenta."); return; }
+  if(typeof mqtt==="undefined"){ setSearchStatus("No se pudo cargar la red. Reintenta."); return; }
   const url = S.usedFallback ? BROKER_FALLBACK : BROKER;
   let lob;
   try{ lob = mqtt.connect(url, {clientId:"lob_"+S.cid, clean:true, reconnectPeriod:2500, connectTimeout:8000, keepalive:30}); }
-  catch(e){ drawSearching("No se pudo conectar. Reintenta."); return; }
+  catch(e){ setSearchStatus("No se pudo conectar. Reintenta."); return; }
   S.lobby = lob;
   const mm = makeMatchmaker({
     cid: S.cid,
@@ -395,20 +402,20 @@ function quickMatch(){
     randRoom: randCode,
     setTimer:(ms,fn)=>setTimeout(fn,ms),
     clearTimer:(id)=>clearTimeout(id),
-    onStatus:(txt)=>{ if(S.phase==="searching") drawSearching(txt); },
+    onStatus:(txt)=>setSearchStatus(txt),
     onHostWaiting:(room)=>startHostFromMatch(room),
     onHostCancel:()=>teardownHostGame(),
     onGuest:(room)=>{ closeLobby(); joinRoom(room); }
   });
   S.mm = mm;
-  lob.on("connect", ()=>{ if(S.quick && S.phase==="searching") mm.begin(); });
+  lob.on("connect", ()=>{ if(S.quick && !S._mmStarted){ S._mmStarted=true; mm.begin(); } });
   lob.on("message", (topic,pl)=>{ if(topic.indexOf(LOBBY_ROOT)===0) mm.onMessage(topic.slice(LOBBY_ROOT.length), pl.toString()); });
   lob.on("error", ()=>{});
 }
 function startHostFromMatch(room){
   S.role="host"; S.room=room; S.ready=false; S.opp={name:null,ready:false,present:false};
   S.phase="create-wait";
-  drawSearching("Buscando rival…");
+  setSearchStatus("Buscando rival…");   // mismo pantalla, solo cambia el texto (sin parpadeo)
   connect(S.room, ()=>{});
 }
 function teardownHostGame(){
@@ -417,17 +424,27 @@ function teardownHostGame(){
   S.client=null; S.connected=false; S.role=null; S.room=null; S.opp={name:null,ready:false,present:false};
   S.phase="searching";
 }
+function spinningGlobe(){
+  return `<div class="globe-3d"><svg width="58" height="58" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="9"/><path d="M3.2 9.5h17.6M3.2 14.5h17.6"/><ellipse class="mer" cx="12" cy="12" rx="9" ry="9"/>
+  </svg></div>`;
+}
 function drawSearching(txt){
   render(`
     <div class="handoff">
-      <div class="icon">${ICON('globe',52,'#34C759')}</div>
+      <div class="icon">${spinningGlobe()}</div>
       <div class="phase-title">Partida rápida</div>
-      <p class="phase-sub">${txt||"Buscando rival…"}</p>
+      <p class="phase-sub" id="searchmsg">${txt||"Buscando rival…"}</p>
       <p class="hint">Te emparejamos con cualquiera que esté buscando ahora mismo.</p>
     </div>
     <button class="btn secondary" id="cancel">Cancelar</button>
   `);
   document.getElementById("cancel").onclick=cancelQuick;
+}
+// Actualiza solo el texto de estado (sin repintar -> sin parpadeo)
+function setSearchStatus(txt){
+  const el=document.getElementById("searchmsg");
+  if(el) el.textContent=txt; else drawSearching(txt);
 }
 function cancelQuick(){
   try{ if(S.mm) S.mm.cancel(); }catch(e){}
@@ -796,7 +813,7 @@ function showRoom(){
   render(`
     <h2 class="phase-title">¿Cómo quieres jugar?</h2>
     <p class="phase-sub">Partida rápida contra el mundo, con un amigo por código, o contra el bot.</p>
-    <button class="btn green" id="quick">${iconLabel('globe','Partida rápida')}</button>
+    <button class="btn green" id="quick"><span style="display:inline-flex;align-items:center;gap:10px;justify-content:center"><span class="globe-tilt">${ICON('globe',22)}</span><span>Partida rápida</span></span></button>
     <button class="btn secondary" id="create">${iconLabel('people','Crear una sala')}</button>
     <button class="btn secondary" id="join">${iconLabel('key','Unirme con un código')}</button>
     <button class="btn secondary" id="bot">${iconLabel('robot','Jugar contra un bot')}</button>
