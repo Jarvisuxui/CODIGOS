@@ -664,7 +664,7 @@ function ICON(name, size, color){
   const head = `width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;flex:none"`;
   const P = {
     dice:`<rect x="3.2" y="3.2" width="17.6" height="17.6" rx="5.2"/><circle cx="8" cy="8" r="1.3" fill="${color}" stroke="none"/><circle cx="16" cy="8" r="1.3" fill="${color}" stroke="none"/><circle cx="12" cy="12" r="1.3" fill="${color}" stroke="none"/><circle cx="8" cy="16" r="1.3" fill="${color}" stroke="none"/><circle cx="16" cy="16" r="1.3" fill="${color}" stroke="none"/>`,
-    key:`<circle cx="8.6" cy="8.6" r="4.4"/><path d="M11.7 11.7l6.9 6.9-1.5 1.5-1.3-1.3-1.4 1.4-1.5-1.5 1.4-1.4-1.6-1.6z"/>`,
+    key:`<circle cx="7.2" cy="12" r="4"/><path d="M11.2 10.6h9.4v2.8h-2.1v2.7h-2.7v-2.7h-4.6z"/>`,
     hourglass:`<path d="M6.8 3.5h10.4v1.1c0 2.9-2.1 4.7-3.8 6v2.8c1.7 1.3 3.8 3.1 3.8 6v1.1H6.8v-1.1c0-2.9 2.1-4.7 3.8-6v-2.8c-1.7-1.3-3.8-3.1-3.8-6z"/>`,
     signal:`<circle cx="12" cy="12" r="2.1" fill="${color}" stroke="none"/><circle cx="12" cy="12" r="5.6"/><circle cx="12" cy="12" r="9"/>`,
     clock:`<circle cx="12" cy="12" r="8.8"/><path d="M12 7.2v4.8l3.2 1.9"/>`,
@@ -678,14 +678,14 @@ function ICON(name, size, color){
     back:`<path d="M10 5.2h7.6a2.7 2.7 0 0 1 2.7 2.7v8.2a2.7 2.7 0 0 1-2.7 2.7H10a2.7 2.7 0 0 1-2.1-1l-3.2-3.9a2.7 2.7 0 0 1 0-3.4l3.2-3.9a2.7 2.7 0 0 1 2.1-1z"/><path d="M12.7 9.7l4.6 4.6M17.3 9.7l-4.6 4.6"/>`,
     share:`<circle cx="18" cy="5.4" r="2.8"/><circle cx="6" cy="12" r="2.8"/><circle cx="18" cy="18.6" r="2.8"/><path d="M8.5 10.7l7-4M8.5 13.3l7 4"/>`,
     link:`<path d="M9.2 14.8l5.6-5.6"/><path d="M10.7 6.6l1.2-1.2a4.1 4.1 0 0 1 5.8 5.8l-2.1 2.1"/><path d="M13.3 17.4l-1.2 1.2a4.1 4.1 0 0 1-5.8-5.8l2.1-2.1"/>`,
-    globe:`<circle cx="12" cy="12" r="8.8"/><ellipse cx="12" cy="12" rx="8.8" ry="3.3"/><ellipse cx="12" cy="12" rx="3.5" ry="8.8"/>`,
-    people:`<circle cx="16.4" cy="9.6" r="2.5"/><path d="M12.9 18.6v-.4a4 4 0 0 1 8 0v.4z"/><circle cx="8.8" cy="7.8" r="2.9"/><path d="M4.2 17.6v-.5a4.6 4.6 0 0 1 9.2 0v.5z"/>`,
-    robot:`<rect x="5" y="8.6" width="14" height="10.4" rx="4.2"/><path d="M12 5.6v3"/><circle cx="12" cy="4.4" r="1.1"/><circle cx="9.4" cy="12.9" r="1.2" fill="${color}" stroke="none"/><circle cx="14.6" cy="12.9" r="1.2" fill="${color}" stroke="none"/><rect x="9.3" y="15.3" width="5.4" height="1.9" rx="0.95"/><rect x="3.1" y="12" width="1.9" height="3.6" rx="0.95"/><rect x="19" y="12" width="1.9" height="3.6" rx="0.95"/>`
+    globe:`<circle cx="12" cy="12" r="8.8"/><ellipse cx="12" cy="12" rx="8.8" ry="3.7"/><ellipse cx="12" cy="12" rx="3.9" ry="8.8"/>`,
+    people:`<circle cx="16.9" cy="9.9" r="2.5"/><path d="M13.6 18.8v-.3a3.8 3.8 0 0 1 7.6 0v.3z"/><circle cx="8.4" cy="8.2" r="3.2"/><path d="M3 18.8v-.4a5.4 5.4 0 0 1 10.8 0v.4z"/>`,
+    robot:`<rect x="4.6" y="7.8" width="14.8" height="11.2" rx="4.4"/><path d="M12 4.9v2.9"/><circle cx="12" cy="3.9" r="1.2"/><circle cx="9.2" cy="12.6" r="1.5" fill="${color}" stroke="none"/><circle cx="14.8" cy="12.6" r="1.5" fill="${color}" stroke="none"/><rect x="9.2" y="15.4" width="5.6" height="2" rx="1"/>`
   };
   return `<svg ${head}>${P[name]||""}</svg>`;
 }
 function iconLabel(name, text){
-  return `<span style="display:inline-flex;align-items:center;gap:10px;justify-content:center">${ICON(name,22)}<span>${text}</span></span>`;
+  return `<span style="display:inline-flex;align-items:center;gap:11px;justify-content:center">${ICON(name,25)}<span>${text}</span></span>`;
 }
 
 // ================= Globo alámbrico 3D (esfera proyectada en perspectiva) =================
