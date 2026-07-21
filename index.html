@@ -140,6 +140,18 @@
   .badge.you{background:var(--accent);color:#fff;}
   .badge.wait{background:var(--fill2);color:var(--label3);}
 
+  .clocks{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px;}
+  .clk{flex:1;position:relative;background:var(--fill);border-radius:16px;padding:9px 10px;text-align:center;border:1.5px solid transparent;transition:.15s;}
+  .clk.act{border-color:var(--accent);background:#fff;box-shadow:0 0 0 3px rgba(52,199,89,.14);}
+  .clk-n{font-size:12px;color:var(--label3);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .clk-t{font-family:var(--disp);font-weight:700;font-size:26px;color:var(--label);font-variant-numeric:tabular-nums;letter-spacing:.5px;line-height:1.1;}
+  .clk.act .clk-t{color:var(--accent);}
+  .clk.low .clk-t{color:var(--red);}
+  .clk.act.low{border-color:var(--red);box-shadow:0 0 0 3px rgba(255,59,48,.16);}
+  .vs{font-family:var(--disp);font-size:11px;color:var(--label3);font-weight:700;flex:none;}
+  .bonus-pop{position:absolute;left:50%;top:-4px;transform:translateX(-50%);font-family:var(--disp);font-weight:800;color:#34c759;font-size:19px;pointer-events:none;white-space:nowrap;animation:bonusUp 1s ease forwards;}
+  @keyframes bonusUp{0%{opacity:0;transform:translateX(-50%) translateY(6px) scale(.8);}20%{opacity:1;transform:translateX(-50%) translateY(0) scale(1.1);}100%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(1);}}
+
   .history{margin-top:16px;max-height:32vh;overflow-y:auto;}
   .history h3{font-family:var(--disp);font-weight:600;font-size:13px;color:var(--label3);letter-spacing:.2px;margin:0 0 9px;text-transform:uppercase;}
   .hrow{display:flex;align-items:center;justify-content:space-between;border-radius:14px;padding:12px 14px;margin-bottom:8px;background:var(--fill);}
@@ -281,6 +293,7 @@ function botTurn(){
   S.oppLastGuess = { value:g, hits };
   if(hits>0) alertHit(hits, hits===4);
   showWarn(hits, "El Bot", hits===4);
+  if(hits>0 && hits<4){ S.clock.opp += hits*BONUS_MS; showBonus('opp', hits*20); }
   if(hits===4){ endGame(false); return; }
   S.myTurn = true;
   drawPlay();
@@ -468,14 +481,22 @@ function onEvent(e){
     S.oppLastGuess = { value:e.value, hits };
     if(hits>0) alertHit(hits, win);
     showWarn(hits, S.opp.name || "Tu rival", win);
+    if(hits>0 && hits<4 && S.clock){ S.clock.opp += hits*BONUS_MS; showBonus('opp', hits*20); }  // bonus del rival
     if(win){ endGame(false); }
     else { S.myTurn = true; if(S.phase==="play") drawPlay(); }
   }
   else if(e.t === "result"){
     S.waitingResult = false;
     S.guesses.push({ guess:e.value, hits:e.hits });
+    if(e.hits>0 && e.hits<4 && S.clock){ S.clock.me += e.hits*BONUS_MS; showBonus('me', e.hits*20); }  // mi bonus
     if(e.win){ endGame(true); }
     else { S.myTurn = false; if(S.phase==="play") drawPlay(); }
+  }
+  else if(e.t === "clk"){                       // reloj del rival (sincronización)
+    if(S.clock){ S.clock.opp = e.me; updateClockUI(); }
+  }
+  else if(e.t === "timeout"){                   // al rival se le acabó el tiempo -> gano
+    endGame(true, "timeout-opp");
   }
   else if(e.t === "rematch"){
     if(S.phase==="end"){ doRematch(true); }
@@ -743,10 +764,53 @@ function drawLobby(){
   document.getElementById("cancel").onclick=leaveToMenu;
 }
 
+// ================= Reloj de ajedrez =================
+const CLOCK_START = 300000;   // 5:00 por jugador
+const BONUS_MS = 20000;       // +20s por dígito acertado
+function fmtClock(ms){ ms=Math.max(0,ms||0); const s=Math.ceil(ms/1000); const m=(s/60)|0; const ss=s%60; return m+":"+(ss<10?"0":"")+ss; }
+function startClock(){ stopClock(); S._lastTick=performance.now(); S._clockInt=setInterval(clockTick,200); }
+function stopClock(){ if(S._clockInt){ clearInterval(S._clockInt); S._clockInt=null; } }
+function clockTick(){
+  if(S.phase!=="play" || !S.clock) return;
+  const now=performance.now();
+  const dt=now-(S._lastTick||now); S._lastTick=now;
+  if(S.myTurn){
+    S.clock.me-=dt;
+    if(S.clock.me<=0){ S.clock.me=0; updateClockUI(); onMyTimeout(); return; }
+    broadcastClock();
+  } else {
+    S.clock.opp-=dt;
+    if(S.clock.opp<0) S.clock.opp=0;
+    if(S.mode==="bot" && S.clock.opp<=0){ updateClockUI(); stopClock(); endGame(true,"timeout-opp"); return; }
+  }
+  updateClockUI();
+}
+function onMyTimeout(){ stopClock(); if(S.mode==="online") sendEvent({t:"timeout"}); endGame(false,"timeout-me"); }
+function broadcastClock(){
+  if(S.mode!=="online") return;
+  const now=performance.now();
+  if(now-(S._lastClkSent||0) > 550){ S._lastClkSent=now; sendEvent({t:"clk", me:Math.round(S.clock.me)}); }
+}
+function updateClockUI(){
+  if(!S.clock) return;
+  const me=document.getElementById("clk-me"), op=document.getElementById("clk-opp");
+  if(me){ me.textContent=fmtClock(S.clock.me); const p=me.parentElement; p.classList.toggle('low',S.clock.me<30000); p.classList.toggle('act',S.myTurn); }
+  if(op){ op.textContent=fmtClock(S.clock.opp); const p=op.parentElement; p.classList.toggle('low',S.clock.opp<30000); p.classList.toggle('act',!S.myTurn); }
+}
+function showBonus(which, sec){
+  const el=document.getElementById(which==='me'?"clk-me":"clk-opp");
+  if(!el||!el.parentElement) return;
+  const s=document.createElement("span"); s.className="bonus-pop"; s.textContent="+"+sec+"s";
+  el.parentElement.appendChild(s);
+  setTimeout(()=>{ try{ s.remove(); }catch(e){} }, 1000);
+}
+
 function startPlay(){
   S.phase="play"; S.buffer="";
   S.myTurn = (S.mode==="bot") ? true : (S.role==="host");   // contra el bot, tú empiezas
+  S.clock = { me:CLOCK_START, opp:CLOCK_START }; S._lastClkSent=0;
   drawPlay();
+  startClock();
 }
 function drawPlay(){
   const hist = S.guesses;
@@ -777,10 +841,12 @@ function drawPlay(){
     center = `<div class="handoff"><div class="icon">${ICON('clock',52,'#8e8e93')}</div><p class="phase-sub">${txt}</p>${last}</div>`;
   }
 
+  const cl = S.clock || {me:CLOCK_START, opp:CLOCK_START};
   render(`
-    <div class="turnbar">
-      <span class="name">${S.name}</span>
-      <span class="badge ${S.myTurn?'you':'wait'}">${S.myTurn?'TU TURNO':'ESPERA'}</span>
+    <div class="clocks">
+      <div class="clk ${S.myTurn?'act':''}"><div class="clk-n">${S.name}</div><div class="clk-t" id="clk-me">${fmtClock(cl.me)}</div></div>
+      <div class="vs">VS</div>
+      <div class="clk ${!S.myTurn?'act':''}"><div class="clk-n">${S.opp.name||'Rival'}</div><div class="clk-t" id="clk-opp">${fmtClock(cl.opp)}</div></div>
     </div>
     ${center}
     <div class="history">
@@ -790,6 +856,7 @@ function drawPlay(){
     ${statusBar()}
   `);
   refreshStatus();
+  updateClockUI();
   if(S.myTurn) bindKeypad(paintDigits, submitGuess);
 }
 function submitGuess(){
@@ -800,9 +867,10 @@ function submitGuess(){
   if(S.mode==="bot"){
     const hits=exactHits(value, S.bot.secret);
     S.guesses.push({ guess:value, hits });
+    if(hits>0 && hits<4){ S.clock.me += hits*BONUS_MS; showBonus('me', hits*20); }  // +20s por dígito
     if(hits===4){ endGame(true); return; }        // has descubierto la cifra del bot
     S.myTurn=false; drawPlay();
-    setTimeout(botTurn, 850 + (Math.random()*500|0));  // el bot "piensa"
+    setTimeout(botTurn, 900 + (Math.random()*900|0));  // el bot "piensa"
     return;
   }
   S.waitingResult=true; S.myTurn=false;
@@ -810,16 +878,26 @@ function submitGuess(){
   drawPlay();
 }
 
-function endGame(won){ S.phase="end"; S.won=won; drawEnd(); }
+function endGame(won, reason){ stopClock(); S.phase="end"; S.won=won; S.endReason=reason||"guess"; drawEnd(); }
 function drawEnd(){
-  const won=S.won;
+  const won=S.won; const r=S.endReason||"guess"; const opp=S.opp.name||"tu rival";
+  let big, sub;
+  if(won){
+    big = (r==="timeout-opp") ? "¡Ganaste por tiempo!" : "¡Ganaste!";
+    sub = (r==="timeout-opp")
+      ? `A ${opp} se le acabó el tiempo.`
+      : `Adivinaste la cifra de ${opp} en ${S.guesses.length} ${S.guesses.length===1?'intento':'intentos'}.`;
+  } else {
+    big = (r==="timeout-me") ? "Se acabó tu tiempo" : "Te descubrieron";
+    sub = (r==="timeout-me")
+      ? `Te quedaste sin reloj. ${opp} gana.`
+      : `${opp} descubrió tu cifra primero.`;
+  }
   render(`
     <div class="end">
-      <div class="emoji">${won?ICON('trophy',64,'#ffb800'):ICON('unlock',64,'#ff3b30')}</div>
-      <div class="big ${won?'win':'lose'}">${won?"¡Ganaste!":"Te descubrieron"}</div>
-      <p class="phase-sub">${won
-        ? `Adivinaste la cifra de ${S.opp.name||"tu rival"} en ${S.guesses.length} ${S.guesses.length===1?'intento':'intentos'}.`
-        : `${S.opp.name||"Tu rival"} descubrió tu cifra primero.`}</p>
+      <div class="emoji">${won?ICON('trophy',64,'#ffb800'):ICON(r==="timeout-me"?'clock':'unlock',64,'#ff3b30')}</div>
+      <div class="big ${won?'win':'lose'}">${big}</div>
+      <p class="phase-sub">${sub}</p>
       <div class="reveal">Tu cifra era: <b>${S.secret}</b></div>
       <button class="btn gold" id="again">Revancha</button>
       <button class="btn secondary" id="menu">Salir</button>
@@ -854,6 +932,7 @@ function showInfo(title, sub){
 }
 
 function leaveToMenu(){
+  stopClock();
   try{ clearPresence(); }catch(e){}
   try{ if(S.client) S.client.end(true); }catch(e){}
   S.client=null; S.connected=false; S.role=null; S.room=null; S.secret=null;
@@ -868,7 +947,7 @@ document.addEventListener("visibilitychange", ()=>{
   if(document.visibilityState === "visible" && S.client){
     try{ if(audioCtx && audioCtx.state === "suspended") audioCtx.resume(); }catch(e){}
     if(!S.connected){ try{ S.client.reconnect(); }catch(e){} }
-    else { publishPresence(); }  // reafirmar presencia por si el rival nos dio por caídos
+    else { publishPresence(); if(S.phase==="play" && S.myTurn){ S._lastClkSent=0; broadcastClock(); } }
     refreshStatus();
   }
 });
