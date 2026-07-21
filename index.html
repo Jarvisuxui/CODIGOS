@@ -707,9 +707,15 @@ function glbLats(latsDeg){
   return {f,b};
 }
 function glbMers(lonsDeg, spin){
-  let f="",b=""; const N=40;
-  for(const d of lonsDeg){ const lo=d*Math.PI/180+(spin||0), pts=[];
-    for(let i=0;i<=N;i++) pts.push(glbProj(-Math.PI/2 + Math.PI*i/N, lo));
+  // meridiano = círculo mayor COMPLETO por los polos (mitad delantera + trasera)
+  let f="",b=""; const N=64;
+  const ca=Math.cos(GLB.tilt), sa=Math.sin(GLB.tilt);
+  for(const d of lonsDeg){ const th=d*Math.PI/180+(spin||0), pts=[];
+    for(let i=0;i<=N;i++){ const be=2*Math.PI*i/N;
+      const x=Math.sin(th)*Math.sin(be), y=Math.cos(be), z=Math.cos(th)*Math.sin(be);
+      const y2=y*ca - z*sa, z2=y*sa + z*ca;
+      pts.push({ X:GLB.cx+GLB.R*x, Y:GLB.cy-GLB.R*y2, f:z2>=0 });
+    }
     const s=glbSeg(pts); f+=s.f; b+=s.b; }
   return {f,b};
 }
