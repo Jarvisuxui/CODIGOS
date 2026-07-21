@@ -1189,6 +1189,51 @@ document.addEventListener("keydown",(e)=>{
   else if(e.key==="Enter"){ S.phase==="secret"?submitSecret():submitGuess(); }
 });
 
+// ================= Fondo tenue (patrón de iconos + números, estilo wallpaper) =================
+function makeBgPattern(){
+  const c = "#e6eaf2";   // gris muy claro: apenas se insinúa sobre el blanco
+  const ic = {
+    lock:`<rect x="4.5" y="11" width="15" height="9.5" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/><circle cx="12" cy="15.6" r="1.4" fill="${c}" stroke="none"/>`,
+    key:`<circle cx="8" cy="15" r="4"/><path d="M10.9 12.1 20 3M15.5 4.5l3 3M13.5 6.5l2.5 2.5"/>`,
+    target:`<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.2"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/>`,
+    dice:`<rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8" cy="8" r="1.35" fill="${c}" stroke="none"/><circle cx="16" cy="8" r="1.35" fill="${c}" stroke="none"/><circle cx="12" cy="12" r="1.35" fill="${c}" stroke="none"/><circle cx="8" cy="16" r="1.35" fill="${c}" stroke="none"/><circle cx="16" cy="16" r="1.35" fill="${c}" stroke="none"/>`,
+    robot:`<rect x="4.5" y="8.5" width="15" height="10.5" rx="3"/><path d="M12 5v3.5"/><circle cx="12" cy="4" r="1.1" fill="${c}" stroke="none"/><circle cx="9.2" cy="13" r="1.25" fill="${c}" stroke="none"/><circle cx="14.8" cy="13" r="1.25" fill="${c}" stroke="none"/><path d="M9.5 16.4h5"/><path d="M2.6 12.5v3.5M21.4 12.5v3.5"/>`,
+    people:`<circle cx="9" cy="8.5" r="3.3"/><path d="M3.5 19.5a5.5 5.5 0 0 1 11 0"/><path d="M15.5 5.6a3.3 3.3 0 0 1 0 5.8"/><path d="M16 14.4a5.5 5.5 0 0 1 4.5 5.1"/>`
+  };
+  const items=[
+    {i:'lock',   x:44, y:52,  r:-12, s:1.15},
+    {n:'7',      x:150,y:44,  r:6,   s:1},
+    {i:'key',    x:252,y:66,  r:14,  s:1.1},
+    {i:'target', x:70, y:150, r:0,   s:1.2},
+    {n:'3',      x:170,y:150, r:-8,  s:1},
+    {i:'dice',   x:262,y:166, r:-10, s:1.1},
+    {i:'robot',  x:50, y:250, r:8,   s:1.15},
+    {n:'5',      x:150,y:246, r:10,  s:1},
+    {i:'people', x:252,y:250, r:-6,  s:1.1},
+    {n:'1',      x:112,y:200, r:-6,  s:1},
+    {n:'9',      x:206,y:110, r:8,   s:1}
+  ];
+  let body="";
+  for(const it of items){
+    if(it.i){
+      const sc=(26*it.s/24).toFixed(3);
+      body+=`<g transform="translate(${it.x} ${it.y}) rotate(${it.r}) scale(${sc}) translate(-12 -12)" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ic[it.i]}</g>`;
+    } else {
+      body+=`<text x="${it.x}" y="${it.y}" transform="rotate(${it.r} ${it.x} ${it.y})" font-family="-apple-system,system-ui,sans-serif" font-weight="800" font-size="${(26*it.s)}" fill="${c}" text-anchor="middle" dominant-baseline="central">${it.n}</text>`;
+    }
+  }
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300">${body}</svg>`;
+  return "data:image/svg+xml,"+encodeURIComponent(svg);
+}
+function applyBgPattern(){
+  try{
+    screen.style.backgroundImage='url("'+makeBgPattern()+'")';
+    screen.style.backgroundRepeat='repeat';
+    screen.style.backgroundPosition='center top';
+  }catch(e){}
+}
+applyBgPattern();
+
 showWelcome();
 </script>
 </body>
