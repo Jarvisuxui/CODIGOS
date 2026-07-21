@@ -221,7 +221,7 @@ const S = {
   myTurn: false, guesses: [],
   opp: { name: null, ready: false, present: false },
   ready: false, client: null, connected: false, waitingResult: false,
-  oppLastGuess: null, usedFallback: false
+  oppLastGuess: null, usedFallback: false, oppEverPresent: false
 };
 
 const screen = document.getElementById("screen");
@@ -319,14 +319,16 @@ function fallbackCopy(txt){
 // ================= MQTT =================
 function topics(room){ return { presence: TOPIC_ROOT + "/" + room + "/p/", events: TOPIC_ROOT + "/" + room + "/e" }; }
 function connect(room, onReady){
+  if(typeof mqtt === "undefined"){ console.warn("MQTT no disponible"); return; }
   const t = topics(room);
   const willTopic = t.presence + S.cid;
   const url = S.usedFallback ? BROKER_FALLBACK : BROKER;
-  const client = mqtt.connect(url, {
+  let client;
+  try{ client = mqtt.connect(url, {
     clientId: "juego_" + S.cid, clean: true, reconnectPeriod: 2500,
     connectTimeout: 8000, keepalive: 30,
     will: { topic: willTopic, payload: "", qos:0, retain:true }
-  });
+  }); }catch(e){ console.warn("MQTT connect falló", e); return; }
   S.client = client;
   let firstConnect = true;
   client.on("connect", ()=>{
@@ -371,7 +373,7 @@ function handleMessage(topic, msg, t){
     if(who === S.cid) return;
     if(!msg){ if(S.opp.present){ S.opp.present=false; S.opp.ready=false; onOppLeft(); } return; }
     let d; try{ d=JSON.parse(msg); }catch(e){ return; }
-    S.opp.name = d.name || "Rival"; S.opp.ready = !!d.ready; S.opp.present = true;
+    S.opp.name = d.name || "Rival"; S.opp.ready = !!d.ready; S.opp.present = true; S.oppEverPresent = true;
     onPresenceUpdate();
     return;
   }
@@ -389,13 +391,11 @@ function onPresenceUpdate(){
   } else if(S.phase === "create-wait"){
     if(S.opp.present){ goSecret(); }
   }
+  refreshStatus();
 }
-function onOppLeft(){
-  if(S.phase === "play" || S.phase === "lobby"){
-    showInfo("Tu rival se desconectó", "Esperando a que "+ (S.opp.name||"tu rival") +" vuelva a la sala… (deja esta pantalla abierta)");
-    S.phase = "lobby-wait-back";
-  }
-}
+// El rival desapareció de la red (cambió de app, bloqueó el móvil, señal...).
+// NO le sacamos de la partida: mantenemos el estado y solo mostramos "reconectando".
+function onOppLeft(){ refreshStatus(); }
 function onEvent(e){
   if(e.t === "guess"){
     const hits = exactHits(e.value, S.secret);
@@ -465,28 +465,37 @@ function keypad(){
   h+=`<button class="key ok" data-act="ok">${ICON('check',24)}</button>`;
   return h+'</div>';
 }
+function statusText(){
+  if(!S.connected) return { cls:"wait", txt:"Reconectando…" };
+  if(S.opp.present) return { cls:"on", txt:"Conectado con "+(S.opp.name||"rival") };
+  if(S.oppEverPresent) return { cls:"wait", txt:"Reconectando con "+(S.opp.name||"tu rival")+"…" };
+  return { cls:"wait", txt:"Conectado — esperando rival" };
+}
 function statusBar(){
-  let dot="off", txt="Sin conexión";
-  if(S.connected){
-    if(S.opp.present){ dot="on"; txt="Conectado con "+(S.opp.name||"rival"); }
-    else { dot="wait"; txt="Conectado — esperando rival"; }
-  } else { dot="wait"; txt="Conectando…"; }
-  return `<div class="status"><span class="dot ${dot}"></span><span id="stxt">${txt}</span></div>`;
+  const s = statusText();
+  return `<div class="status"><span class="dot ${s.cls}"></span><span id="stxt">${s.txt}</span></div>`;
 }
 function refreshStatus(){
   const el = document.getElementById("stxt");
   if(!el) return;
   const dot = el.parentElement.querySelector(".dot");
-  let cls="off", txt="Sin conexión";
-  if(S.connected){
-    if(S.opp.present){ cls="on"; txt="Conectado con "+(S.opp.name||"rival"); }
-    else { cls="wait"; txt="Conectado — esperando rival"; }
-  } else { cls="wait"; txt="Conectando…"; }
-  dot.className = "dot "+cls; el.textContent = txt;
+  const s = statusText();
+  dot.className = "dot "+s.cls; el.textContent = s.txt;
 }
 function render(html){
   screen.classList.remove("fade"); void screen.offsetWidth;
   screen.innerHTML = html; screen.classList.add("fade");
+}
+// Actualiza SOLO las casillas de dígitos, sin repintar (ni reanimar) toda la pantalla.
+// Esto evita el parpadeo al teclear.
+function paintDigits(){
+  const cur = screen.querySelector(".digits");
+  if(!cur) return;
+  const tmp = document.createElement("div");
+  tmp.innerHTML = digitsRow(S.buffer);
+  cur.replaceWith(tmp.firstElementChild);
+  const msg = document.getElementById("msg");
+  if(msg) msg.textContent = "";
 }
 function bindKeypad(redraw, onOk){
   screen.querySelectorAll(".key").forEach(k=>{
@@ -592,8 +601,8 @@ function joinScreen(){
 
 function joinRoom(code){
   S.role="guest"; S.room=code; S.ready=false; S.opp={name:null,ready:false,present:false};
+  goSecret();                 // mostrar la pantalla primero (no depender de la red)
   connect(S.room, ()=>{});
-  goSecret();
 }
 
 function goSecret(){ S.phase="secret"; S.buffer=""; drawSecret(); }
@@ -607,7 +616,7 @@ function drawSecret(){
     ${statusBar()}
   `);
   refreshStatus();
-  bindKeypad(drawSecret, submitSecret);
+  bindKeypad(paintDigits, submitSecret);
 }
 function submitSecret(){
   const msg=document.getElementById("msg");
@@ -680,7 +689,7 @@ function drawPlay(){
     ${statusBar()}
   `);
   refreshStatus();
-  if(S.myTurn) bindKeypad(drawPlay, submitGuess);
+  if(S.myTurn) bindKeypad(paintDigits, submitGuess);
 }
 function submitGuess(){
   const msg=document.getElementById("msg");
@@ -743,12 +752,23 @@ function leaveToMenu(){
   showRoom();
 }
 
-window.addEventListener("beforeunload", ()=>{ try{ clearPresence(); }catch(e){} });
+// Al volver a la app / desbloquear el móvil: reconectar sin perder la partida.
+document.addEventListener("visibilitychange", ()=>{
+  if(document.visibilityState === "visible" && S.client){
+    try{ if(audioCtx && audioCtx.state === "suspended") audioCtx.resume(); }catch(e){}
+    if(!S.connected){ try{ S.client.reconnect(); }catch(e){} }
+    else { publishPresence(); }  // reafirmar presencia por si el rival nos dio por caídos
+    refreshStatus();
+  }
+});
+window.addEventListener("pageshow", (e)=>{
+  if(e.persisted && S.client && !S.connected){ try{ S.client.reconnect(); }catch(err){} }
+});
 
 document.addEventListener("keydown",(e)=>{
   if(S.phase!=="secret" && !(S.phase==="play" && S.myTurn)) return;
-  if(/^[0-9]$/.test(e.key)){ if(S.buffer.length<4){ S.buffer+=e.key; S.phase==="secret"?drawSecret():drawPlay(); } }
-  else if(e.key==="Backspace"){ S.buffer=S.buffer.slice(0,-1); S.phase==="secret"?drawSecret():drawPlay(); }
+  if(/^[0-9]$/.test(e.key)){ if(S.buffer.length<4){ S.buffer+=e.key; paintDigits(); } }
+  else if(e.key==="Backspace"){ S.buffer=S.buffer.slice(0,-1); paintDigits(); }
   else if(e.key==="Enter"){ S.phase==="secret"?submitSecret():submitGuess(); }
 });
 
