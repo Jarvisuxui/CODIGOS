@@ -8,7 +8,7 @@
 <style>
   :root{
     --disp:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text",system-ui,"Helvetica Neue",Arial,sans-serif;
-    --accent:#007AFF; --accent-press:#0067d6;
+    --accent:#34C759; --accent-press:#2aa74a;
     --bg:#f2f2f7; --card:#ffffff;
     --label:#1c1c1e; --label2:#6b6b70; --label3:#8e8e93;
     --sep:rgba(60,60,67,.12); --fill:#f2f2f7; --fill2:#e9e9ee;
@@ -19,7 +19,7 @@
   body{
     font-family:var(--disp); color:var(--label);
     background:
-      radial-gradient(120% 50% at 50% -10%, rgba(0,122,255,.06), transparent 60%),
+      radial-gradient(120% 50% at 50% -10%, rgba(52,199,89,.06), transparent 60%),
       linear-gradient(180deg,#f7f7fb 0%, #eef0f5 100%);
     background-attachment:fixed;
     min-height:100vh; min-height:100dvh;
@@ -61,7 +61,7 @@
     transition:.16s ease; font-variant-numeric:tabular-nums;
   }
   .digit.filled{background:#fff;border-color:rgba(0,0,0,.08);box-shadow:0 1px 3px rgba(0,0,0,.06);}
-  .digit.active{border-color:var(--accent);box-shadow:0 0 0 3.5px rgba(0,122,255,.18);}
+  .digit.active{border-color:var(--accent);box-shadow:0 0 0 3.5px rgba(52,199,89,.18);}
   .digit.secret{color:var(--label3);}
 
   .keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:22px 0 4px;}
@@ -74,7 +74,7 @@
   .key:active{transform:scale(.96);background:var(--fill2);}
   .key.del{background:var(--fill);color:var(--label3);border-color:transparent;box-shadow:none;}
   .key.del:active{background:var(--fill2);}
-  .key.ok{background:var(--accent);color:#fff;border-color:transparent;box-shadow:0 2px 8px rgba(0,122,255,.3);}
+  .key.ok{background:var(--accent);color:#fff;border-color:transparent;box-shadow:0 2px 8px rgba(52,199,89,.3);}
   .key.ok:active{background:var(--accent-press);}
 
   .msg{min-height:20px;text-align:center;font-size:14px;margin:8px 0 0;color:var(--red);font-weight:500;}
@@ -83,24 +83,24 @@
     font-family:var(--disp);font-weight:600;letter-spacing:-.01em;
     display:block;width:100%;border:none;border-radius:15px;padding:15px 16px;font-size:18px;
     color:#fff;cursor:pointer;margin-top:12px;
-    background:var(--accent); box-shadow:0 2px 10px rgba(0,122,255,.22);
+    background:var(--accent); box-shadow:0 2px 10px rgba(52,199,89,.22);
     transition:transform .06s, background .12s, box-shadow .12s;
   }
   .btn:active{transform:scale(.985);background:var(--accent-press);}
   .btn:disabled{opacity:.4;}
-  .btn.green{background:var(--accent);box-shadow:0 2px 10px rgba(0,122,255,.22);}
+  .btn.green{background:var(--accent);box-shadow:0 2px 10px rgba(52,199,89,.22);}
   .btn.green:active{background:var(--accent-press);}
-  .btn.gold{background:var(--accent);box-shadow:0 2px 10px rgba(0,122,255,.22);}
+  .btn.gold{background:var(--accent);box-shadow:0 2px 10px rgba(52,199,89,.22);}
   .btn.gold:active{background:var(--accent-press);}
-  .btn.secondary{background:rgba(0,122,255,.10);color:var(--accent);box-shadow:none;}
-  .btn.secondary:active{background:rgba(0,122,255,.18);}
+  .btn.secondary{background:rgba(52,199,89,.10);color:var(--accent);box-shadow:none;}
+  .btn.secondary:active{background:rgba(52,199,89,.18);}
 
   .field{
     width:100%;padding:14px 16px;font-size:17px;border-radius:14px;border:1px solid rgba(0,0,0,.08);
     background:var(--fill);color:var(--label);margin-bottom:4px;text-align:center;
     font-family:var(--disp);font-weight:500;
   }
-  .field:focus{outline:none;border-color:var(--accent);background:#fff;box-shadow:0 0 0 3.5px rgba(0,122,255,.15);}
+  .field:focus{outline:none;border-color:var(--accent);background:#fff;box-shadow:0 0 0 3.5px rgba(52,199,89,.15);}
   .field.code{font-weight:700;font-size:28px;letter-spacing:8px;color:var(--label);text-transform:uppercase;font-variant-numeric:tabular-nums;}
   label.lbl{display:block;font-size:13px;color:var(--label3);margin:12px 2px 6px;text-align:center;font-weight:500;}
 
@@ -112,7 +112,7 @@
   .rules b{color:var(--label);font-weight:600;}
 
   .invite{
-    background:rgba(0,122,255,.10);color:var(--accent);border-radius:16px;
+    background:rgba(52,199,89,.10);color:var(--accent);border-radius:16px;
     padding:14px 16px;text-align:center;font-weight:600;margin-bottom:16px;font-size:15px;
   }
   .invite b{font-weight:800;letter-spacing:3px;font-size:19px;color:var(--accent);}
@@ -126,7 +126,7 @@
 
   .codebox{
     text-align:center;border-radius:18px;padding:16px;margin:16px 0;
-    background:rgba(0,122,255,.08);border:0.5px solid rgba(0,122,255,.14);
+    background:rgba(52,199,89,.08);border:0.5px solid rgba(52,199,89,.14);
   }
   .codebox .lab{font-size:12px;color:var(--label3);text-transform:uppercase;letter-spacing:1.5px;font-weight:600;}
   .codebox .code{font-family:var(--disp);font-weight:700;font-size:48px;letter-spacing:10px;color:var(--accent);margin-top:2px;font-variant-numeric:tabular-nums;}
@@ -532,7 +532,7 @@ function showWelcome(){
   S.phase="welcome";
   const inviteBanner = INVITE ? `<div class="invite">Te han invitado a la sala <b>${INVITE}</b></div>` : "";
   render(`
-    <div style="text-align:center;margin-bottom:6px">${ICON('target',48,'#007AFF')}</div>
+    <div style="text-align:center;margin-bottom:6px">${ICON('target',48,'#34C759')}</div>
     <h1 id="title" aria-label="CÓDIGOS"></h1>
     <p class="subtitle">Duelo online · dos jugadores, dos móviles</p>
     ${inviteBanner}
@@ -654,7 +654,7 @@ function drawLobby(){
     : `Esperando a que tu rival entre y elija su cifra…`;
   render(`
     <div class="handoff">
-      <div class="icon">${ICON('hourglass',52,'#007AFF')}</div>
+      <div class="icon">${ICON('hourglass',52,'#34C759')}</div>
       <div class="phase-title">¡Listo!</div>
       <p class="phase-sub">Tu cifra está guardada.<br>${oppTxt}</p>
     </div>
@@ -688,7 +688,7 @@ function drawPlay(){
       <p class="msg" id="msg"></p>
       ${keypad()}`;
   } else if(S.waitingResult){
-    center = `<div class="handoff"><div class="icon">${ICON('signal',52,'#007AFF')}</div><p class="phase-sub">Enviando tu intento…</p></div>`;
+    center = `<div class="handoff"><div class="icon">${ICON('signal',52,'#34C759')}</div><p class="phase-sub">Enviando tu intento…</p></div>`;
   } else {
     const last = S.oppLastGuess
       ? `<div class="lasthit">Su último intento acertó <b>${S.oppLastGuess.hits}/4</b> de tus dígitos</div>`
