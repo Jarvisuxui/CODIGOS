@@ -146,7 +146,7 @@
   .hrow .g{font-family:var(--disp);font-weight:600;font-size:22px;letter-spacing:4px;color:var(--label);font-variant-numeric:tabular-nums;}
   .hrow .hits{font-size:13px;color:var(--label3);display:flex;align-items:center;gap:7px;font-weight:400;}
   .pill{font-family:var(--disp);font-weight:600;border-radius:20px;padding:4px 11px;font-size:14px;background:#fff;color:var(--label);border:0.5px solid rgba(0,0,0,.06);}
-  .pill.win{background:var(--green);color:#fff;border-color:transparent;}
+  .pill.win{background:#ffb800;color:#3a2a00;border-color:transparent;}
   .pill.zero{color:var(--label3);background:var(--fill2);}
   .empty{color:var(--label3);font-size:14px;text-align:center;padding:16px 0;font-weight:400;}
 
@@ -157,7 +157,7 @@
   .end{text-align:center;}
   .end .emoji{margin-bottom:8px;}
   .end .big{font-family:var(--disp);font-weight:800;font-size:32px;margin:4px 0;letter-spacing:-.02em;}
-  .end .win{color:var(--green);}
+  .end .win{color:#e39400;}
   .end .lose{color:var(--red);}
   .reveal{border-radius:16px;padding:16px;margin:16px 0;color:var(--label2);font-size:15px;line-height:1.8;background:var(--fill);font-weight:400;}
   .reveal b{font-family:var(--disp);font-weight:700;color:var(--label);font-size:22px;letter-spacing:3px;font-variant-numeric:tabular-nums;}
@@ -726,7 +726,7 @@ function drawEnd(){
   const won=S.won;
   render(`
     <div class="end">
-      <div class="emoji">${won?ICON('trophy',64,'#34c759'):ICON('unlock',64,'#ff3b30')}</div>
+      <div class="emoji">${won?ICON('trophy',64,'#ffb800'):ICON('unlock',64,'#ff3b30')}</div>
       <div class="big ${won?'win':'lose'}">${won?"¡Ganaste!":"Te descubrieron"}</div>
       <p class="phase-sub">${won
         ? `Adivinaste la cifra de ${S.opp.name||"tu rival"} en ${S.guesses.length} ${S.guesses.length===1?'intento':'intentos'}.`
