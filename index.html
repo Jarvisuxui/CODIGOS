@@ -656,24 +656,24 @@ function ICON(name, size, color){
   size = size || 24; color = color || "currentColor";
   const head = `width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;flex:none"`;
   const P = {
-    dice:`<rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8" cy="8" r="1.35" fill="${color}" stroke="none"/><circle cx="16" cy="8" r="1.35" fill="${color}" stroke="none"/><circle cx="12" cy="12" r="1.35" fill="${color}" stroke="none"/><circle cx="8" cy="16" r="1.35" fill="${color}" stroke="none"/><circle cx="16" cy="16" r="1.35" fill="${color}" stroke="none"/>`,
-    key:`<circle cx="8" cy="15" r="4"/><path d="M10.9 12.1 20 3M15.5 4.5l3 3M13.5 6.5l2.5 2.5"/>`,
-    hourglass:`<path d="M6 3h12M6 21h12"/><path d="M7.5 3c0 4.5 9 6 9 0M7.5 21c0-4.5 9-6 9 0"/>`,
-    signal:`<circle cx="12" cy="12" r="2" fill="${color}" stroke="none"/><path d="M7.6 7.6a6 6 0 000 8.8M16.4 7.6a6 6 0 010 8.8M4.8 4.8a10 10 0 000 14.4M19.2 4.8a10 10 0 010 14.4"/>`,
-    clock:`<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>`,
-    warning:`<path d="M12 3.6 21.4 20H2.6z"/><path d="M12 10v4.2M12 17.4h.01"/>`,
-    trophy:`<path d="M7 4h10v3.2a5 5 0 01-10 0z"/><path d="M7 5H4v1.2a3 3 0 003 3M17 5h3v1.2a3 3 0 01-3 3"/><path d="M12 12.2v3.8M8.5 20h7M9.6 16h4.8"/>`,
-    unlock:`<rect x="4.5" y="11" width="15" height="9.5" rx="2"/><path d="M8 11V7a4 4 0 017.7-1.6"/><circle cx="12" cy="15.6" r="1.4" fill="${color}" stroke="none"/>`,
-    lock:`<rect x="4.5" y="11" width="15" height="9.5" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/><circle cx="12" cy="15.6" r="1.4" fill="${color}" stroke="none"/>`,
-    shield:`<path d="M12 3l7.5 3v5c0 5.2-3.3 7.4-7.5 8.4C7.8 18.4 4.5 16.2 4.5 11V6z"/><path d="M8.8 12l2.2 2.2 4.4-4.6"/>`,
-    target:`<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.2"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/>`,
-    check:`<path d="M4 12.5l5 5L20 6"/>`,
-    back:`<path d="M9 5h9a2 2 0 012 2v10a2 2 0 01-2 2H9l-6-7z"/><path d="M13 9.5l4 4M17 9.5l-4 4"/>`,
-    share:`<circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8l7.4-4.3M8.3 13.2l7.4 4.3"/>`,
-    link:`<path d="M9 15l6-6"/><path d="M10.5 6.5l1.2-1.2a4 4 0 015.7 5.7l-2.2 2.2"/><path d="M13.5 17.5l-1.2 1.2a4 4 0 01-5.7-5.7l2.2-2.2"/>`,
-    globe:`<circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="9" ry="3.3"/><ellipse cx="12" cy="12" rx="3.6" ry="9"/><path d="M4.7 8.2Q12 6 19.3 8.2"/><path d="M4.7 15.8Q12 18 19.3 15.8"/>`,
-    people:`<circle cx="9" cy="8.5" r="3.3"/><path d="M3.5 19.5a5.5 5.5 0 0 1 11 0"/><path d="M15.5 5.6a3.3 3.3 0 0 1 0 5.8"/><path d="M16 14.4a5.5 5.5 0 0 1 4.5 5.1"/>`,
-    robot:`<rect x="4.5" y="8.5" width="15" height="10.5" rx="3"/><path d="M12 5v3.5"/><circle cx="12" cy="4" r="1.1" fill="${color}" stroke="none"/><circle cx="9.2" cy="13" r="1.25" fill="${color}" stroke="none"/><circle cx="14.8" cy="13" r="1.25" fill="${color}" stroke="none"/><path d="M9.5 16.4h5"/><path d="M2.6 12.5v3.5M21.4 12.5v3.5"/>`
+    dice:`<rect x="3.2" y="3.2" width="17.6" height="17.6" rx="5.2"/><circle cx="8" cy="8" r="1.3" fill="${color}" stroke="none"/><circle cx="16" cy="8" r="1.3" fill="${color}" stroke="none"/><circle cx="12" cy="12" r="1.3" fill="${color}" stroke="none"/><circle cx="8" cy="16" r="1.3" fill="${color}" stroke="none"/><circle cx="16" cy="16" r="1.3" fill="${color}" stroke="none"/>`,
+    key:`<circle cx="8.6" cy="8.6" r="4.4"/><path d="M11.7 11.7l6.9 6.9-1.5 1.5-1.3-1.3-1.4 1.4-1.5-1.5 1.4-1.4-1.6-1.6z"/>`,
+    hourglass:`<path d="M6.8 3.5h10.4v1.1c0 2.9-2.1 4.7-3.8 6v2.8c1.7 1.3 3.8 3.1 3.8 6v1.1H6.8v-1.1c0-2.9 2.1-4.7 3.8-6v-2.8c-1.7-1.3-3.8-3.1-3.8-6z"/>`,
+    signal:`<circle cx="12" cy="12" r="2.1" fill="${color}" stroke="none"/><circle cx="12" cy="12" r="5.6"/><circle cx="12" cy="12" r="9"/>`,
+    clock:`<circle cx="12" cy="12" r="8.8"/><path d="M12 7.2v4.8l3.2 1.9"/>`,
+    warning:`<path d="M10.5 4.7a1.75 1.75 0 0 1 3 0l7 12.1a1.75 1.75 0 0 1-1.5 2.6H5a1.75 1.75 0 0 1-1.5-2.6z"/><path d="M12 9.7v4"/><circle cx="12" cy="16.3" r="1" fill="${color}" stroke="none"/>`,
+    trophy:`<path d="M8 4.6h8v3.1a4 4 0 0 1-8 0z"/><path d="M8 5.7H5.6a2.4 2.4 0 0 0 2.4 2.9z"/><path d="M16 5.7h2.4a2.4 2.4 0 0 1-2.4 2.9z"/><path d="M9 19.3l1-3.7h4l1 3.7z"/><path d="M12 11.7v3.9"/>`,
+    unlock:`<rect x="4.8" y="10.5" width="14.4" height="10" rx="3.4"/><path d="M8 10.5V7.1a4 4 0 0 1 7.8-1.3"/><circle cx="12" cy="15.4" r="1.5" fill="${color}" stroke="none"/>`,
+    lock:`<rect x="4.8" y="10.5" width="14.4" height="10" rx="3.4"/><path d="M8 10.5V7.2a4 4 0 0 1 8 0v3.3z"/><circle cx="12" cy="15.4" r="1.5" fill="${color}" stroke="none"/>`,
+    shield:`<path d="M12 3.2l7.4 2.9v5c0 5-3.2 7.2-7.4 8.5-4.2-1.3-7.4-3.5-7.4-8.5v-5z"/><path d="M8.9 12l2.2 2.2 4.2-4.4"/>`,
+    target:`<circle cx="12" cy="12" r="8.8"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1.2" fill="${color}" stroke="none"/>`,
+    check:`<path d="M4.5 12.6l5 5L19.5 6.8"/>`,
+    back:`<path d="M10 5.2h7.6a2.7 2.7 0 0 1 2.7 2.7v8.2a2.7 2.7 0 0 1-2.7 2.7H10a2.7 2.7 0 0 1-2.1-1l-3.2-3.9a2.7 2.7 0 0 1 0-3.4l3.2-3.9a2.7 2.7 0 0 1 2.1-1z"/><path d="M12.7 9.7l4.6 4.6M17.3 9.7l-4.6 4.6"/>`,
+    share:`<circle cx="18" cy="5.4" r="2.8"/><circle cx="6" cy="12" r="2.8"/><circle cx="18" cy="18.6" r="2.8"/><path d="M8.5 10.7l7-4M8.5 13.3l7 4"/>`,
+    link:`<path d="M9.2 14.8l5.6-5.6"/><path d="M10.7 6.6l1.2-1.2a4.1 4.1 0 0 1 5.8 5.8l-2.1 2.1"/><path d="M13.3 17.4l-1.2 1.2a4.1 4.1 0 0 1-5.8-5.8l2.1-2.1"/>`,
+    globe:`<circle cx="12" cy="12" r="8.8"/><ellipse cx="12" cy="12" rx="8.8" ry="3.3"/><ellipse cx="12" cy="12" rx="3.5" ry="8.8"/>`,
+    people:`<circle cx="16.4" cy="9.6" r="2.5"/><path d="M12.9 18.6v-.4a4 4 0 0 1 8 0v.4z"/><circle cx="8.8" cy="7.8" r="2.9"/><path d="M4.2 17.6v-.5a4.6 4.6 0 0 1 9.2 0v.5z"/>`,
+    robot:`<rect x="5" y="8.6" width="14" height="10.4" rx="4.2"/><path d="M12 5.6v3"/><circle cx="12" cy="4.4" r="1.1"/><circle cx="9.4" cy="12.9" r="1.2" fill="${color}" stroke="none"/><circle cx="14.6" cy="12.9" r="1.2" fill="${color}" stroke="none"/><rect x="9.3" y="15.3" width="5.4" height="1.9" rx="0.95"/><rect x="3.1" y="12" width="1.9" height="3.6" rx="0.95"/><rect x="19" y="12" width="1.9" height="3.6" rx="0.95"/>`
   };
   return `<svg ${head}>${P[name]||""}</svg>`;
 }
@@ -887,7 +887,7 @@ function showRoom(){
   render(`
     <h2 class="phase-title">¿Cómo quieres jugar?</h2>
     <p class="phase-sub">Partida rápida contra el mundo, con un amigo por código, o contra el bot.</p>
-    <button class="btn green" id="quick"><span style="display:inline-flex;align-items:center;gap:10px;justify-content:center">${menuGlobe()}<span>Partida rápida</span></span></button>
+    <button class="btn green" id="quick">${iconLabel('globe','Partida rápida')}</button>
     <button class="btn secondary" id="create">${iconLabel('people','Crear una sala')}</button>
     <button class="btn secondary" id="join">${iconLabel('key','Unirme con un código')}</button>
     <button class="btn secondary" id="bot">${iconLabel('robot','Jugar contra un bot')}</button>
