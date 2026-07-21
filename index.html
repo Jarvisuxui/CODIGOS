@@ -427,13 +427,7 @@ function teardownHostGame(){
   S.phase="searching";
 }
 function spinningGlobe(){
-  return `<div class="globe-3d"><svg width="62" height="62" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="12" cy="12" r="9"/>
-    <ellipse cx="12" cy="12" rx="9" ry="3.3"/>
-    <path d="M4.7 8.2Q12 6 19.3 8.2"/>
-    <path d="M4.7 15.8Q12 18 19.3 15.8"/>
-    <ellipse class="mer" cx="12" cy="12" rx="6.6" ry="9"/>
-  </svg></div>`;
+  return `<div style="display:inline-flex">${globeSVG(66, GLB_LATS, GLB_LONS, 0, 1.1)}</div>`;
 }
 function drawSearching(txt){
   render(`
@@ -446,6 +440,7 @@ function drawSearching(txt){
     <button class="btn secondary" id="cancel">Cancelar</button>
   `);
   document.getElementById("cancel").onclick=cancelQuick;
+  startGlobeSpin();
 }
 // Actualiza solo el texto de estado (sin repintar -> sin parpadeo)
 function setSearchStatus(txt){
@@ -453,6 +448,7 @@ function setSearchStatus(txt){
   if(el) el.textContent=txt; else drawSearching(txt);
 }
 function cancelQuick(){
+  stopGlobeSpin();
   try{ if(S.mm) S.mm.cancel(); }catch(e){}
   closeLobby();
   try{ if(S.client) S.client.end(true); }catch(e){}
@@ -658,7 +654,7 @@ function onEvent(e){
 // ================= Iconos (SVG propios) =================
 function ICON(name, size, color){
   size = size || 24; color = color || "currentColor";
-  const head = `width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;flex:none"`;
+  const head = `width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;flex:none"`;
   const P = {
     dice:`<rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8" cy="8" r="1.35" fill="${color}" stroke="none"/><circle cx="16" cy="8" r="1.35" fill="${color}" stroke="none"/><circle cx="12" cy="12" r="1.35" fill="${color}" stroke="none"/><circle cx="8" cy="16" r="1.35" fill="${color}" stroke="none"/><circle cx="16" cy="16" r="1.35" fill="${color}" stroke="none"/>`,
     key:`<circle cx="8" cy="15" r="4"/><path d="M10.9 12.1 20 3M15.5 4.5l3 3M13.5 6.5l2.5 2.5"/>`,
@@ -684,6 +680,72 @@ function ICON(name, size, color){
 function iconLabel(name, text){
   return `<span style="display:inline-flex;align-items:center;gap:10px;justify-content:center">${ICON(name,22)}<span>${text}</span></span>`;
 }
+
+// ================= Globo alámbrico 3D (esfera proyectada en perspectiva) =================
+const GLB = { R:9, cx:12, cy:12, tilt:26*Math.PI/180 };
+function glbProj(lat, lon){
+  const cl=Math.cos(lat), sl=Math.sin(lat);
+  const x=cl*Math.sin(lon), y=sl, z=cl*Math.cos(lon);
+  const ca=Math.cos(GLB.tilt), sa=Math.sin(GLB.tilt);
+  const y2=y*ca - z*sa, z2=y*sa + z*ca;      // inclinar sobre eje X
+  return { X:GLB.cx + GLB.R*x, Y:GLB.cy - GLB.R*y2, f:z2>=0 };   // f = cara frontal
+}
+function glbSeg(pts){                          // divide en tramos frontal/trasero
+  let f="", b="";
+  for(let i=0;i<pts.length-1;i++){
+    const a=pts[i], c=pts[i+1];
+    const s="M"+a.X.toFixed(2)+" "+a.Y.toFixed(2)+"L"+c.X.toFixed(2)+" "+c.Y.toFixed(2);
+    if(a.f&&c.f) f+=s; else b+=s;
+  }
+  return {f,b};
+}
+function glbLats(latsDeg){
+  let f="",b=""; const N=52;
+  for(const d of latsDeg){ const la=d*Math.PI/180, pts=[];
+    for(let i=0;i<=N;i++) pts.push(glbProj(la, 2*Math.PI*i/N));
+    const s=glbSeg(pts); f+=s.f; b+=s.b; }
+  return {f,b};
+}
+function glbMers(lonsDeg, spin){
+  let f="",b=""; const N=40;
+  for(const d of lonsDeg){ const lo=d*Math.PI/180+(spin||0), pts=[];
+    for(let i=0;i<=N;i++) pts.push(glbProj(-Math.PI/2 + Math.PI*i/N, lo));
+    const s=glbSeg(pts); f+=s.f; b+=s.b; }
+  return {f,b};
+}
+function globeSVG(size, latsDeg, lonsDeg, spin, sw){
+  const lg=glbLats(latsDeg), mg=glbMers(lonsDeg, spin||0);
+  return `<svg class="glb-svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="${sw||1.35}" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="9"/>
+    <path class="glb-b" opacity=".3" d="${lg.b+mg.b}"/>
+    <path class="glb-latf" d="${lg.f}"/>
+    <path class="glb-merf" d="${mg.f}"/>
+  </svg>`;
+}
+function menuGlobe(){                           // versión pequeña del menú (color del botón)
+  const lg=glbLats([-40,0,40]), mg=glbMers([0,45,90,135],0);
+  return `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;flex:none">
+    <circle cx="12" cy="12" r="9"/><path opacity=".4" d="${lg.b+mg.b}"/><path d="${lg.f+mg.f}"/>
+  </svg>`;
+}
+let _glbRAF=null;
+const GLB_LATS=[-60,-30,0,30,60], GLB_LONS=[0,30,60,90,120,150];
+function startGlobeSpin(){
+  stopGlobeSpin();
+  const svg=screen.querySelector(".glb-svg"); if(!svg) return;
+  const merf=svg.querySelector(".glb-merf"), glb_b=svg.querySelector(".glb-b");
+  const latB=glbLats(GLB_LATS).b;              // trasera de latitudes (fija)
+  function frame(t){
+    if(!svg.isConnected){ _glbRAF=null; return; }
+    const spin=(t/1000)*0.55;                  // giro lento
+    const mg=glbMers(GLB_LONS, spin);
+    merf.setAttribute("d", mg.f);
+    glb_b.setAttribute("d", latB + mg.b);
+    _glbRAF=requestAnimationFrame(frame);
+  }
+  _glbRAF=requestAnimationFrame(frame);
+}
+function stopGlobeSpin(){ if(_glbRAF){ cancelAnimationFrame(_glbRAF); _glbRAF=null; } }
 
 // ================= Utilidades UI =================
 function digitsRow(value, secret){
@@ -819,7 +881,7 @@ function showRoom(){
   render(`
     <h2 class="phase-title">¿Cómo quieres jugar?</h2>
     <p class="phase-sub">Partida rápida contra el mundo, con un amigo por código, o contra el bot.</p>
-    <button class="btn green" id="quick"><span style="display:inline-flex;align-items:center;gap:10px;justify-content:center"><span class="globe-tilt">${ICON('globe',22)}</span><span>Partida rápida</span></span></button>
+    <button class="btn green" id="quick"><span style="display:inline-flex;align-items:center;gap:10px;justify-content:center">${menuGlobe()}<span>Partida rápida</span></span></button>
     <button class="btn secondary" id="create">${iconLabel('people','Crear una sala')}</button>
     <button class="btn secondary" id="join">${iconLabel('key','Unirme con un código')}</button>
     <button class="btn secondary" id="bot">${iconLabel('robot','Jugar contra un bot')}</button>
@@ -1089,7 +1151,7 @@ function showInfo(title, sub){
 }
 
 function leaveToMenu(){
-  stopClock();
+  stopClock(); stopGlobeSpin();
   try{ if(S.mm) S.mm.cancel(); }catch(e){}
   closeLobby();
   try{ clearPresence(); }catch(e){}
