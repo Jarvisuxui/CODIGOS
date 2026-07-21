@@ -210,7 +210,8 @@ const S = {
   myTurn: false, guesses: [],
   opp: { name: null, ready: false, present: false },
   ready: false, client: null, connected: false, waitingResult: false,
-  oppLastGuess: null, usedFallback: false, oppEverPresent: false
+  oppLastGuess: null, usedFallback: false, oppEverPresent: false,
+  mode: null, bot: null   // mode: "online" | "bot"
 };
 
 const screen = document.getElementById("screen");
@@ -223,6 +224,79 @@ function randCode(){
   const A = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let c=""; for(let i=0;i<4;i++) c += A[Math.floor((performance.now()*7919*(i+3)) % A.length)];
   return c;
+}
+
+// ================= Bot (contra la máquina) =================
+function buildCandidates(){
+  const res=[];
+  for(let a=0;a<10;a++)for(let b=0;b<10;b++){ if(b===a)continue;
+    for(let cc=0;cc<10;cc++){ if(cc===a||cc===b)continue;
+      for(let d=0;d<10;d++){ if(d===a||d===b||d===cc)continue; res.push(""+a+b+cc+d); } } }
+  return res;                                   // 5040 cifras válidas (4 dígitos distintos)
+}
+function randomValidGuess(){
+  const dg=[0,1,2,3,4,5,6,7,8,9];
+  for(let i=dg.length-1;i>0;i--){ const j=(Math.random()*(i+1))|0; const t=dg[i];dg[i]=dg[j];dg[j]=t; }
+  return ""+dg[0]+dg[1]+dg[2]+dg[3];
+}
+// Difícil: minimax acotado — elige el intento que peor-caso deja menos candidatos
+function bestGuess(cands){
+  if(cands.length<=2) return cands[0];
+  let pool=cands;
+  if(cands.length>40){ pool=[]; const step=cands.length/40; for(let i=0;i<40;i++) pool.push(cands[(i*step)|0]); }
+  let best=pool[0], bestWorst=Infinity;
+  for(const g of pool){
+    const buckets={};
+    for(const c of cands){ const h=exactHits(g,c); buckets[h]=(buckets[h]||0)+1; }
+    let worst=0; for(const k in buckets) if(buckets[k]>worst) worst=buckets[k];
+    if(worst<bestWorst){ bestWorst=worst; best=g; }
+  }
+  return best;
+}
+function chooseBotGuess(){
+  const d=S.bot.difficulty, cands=S.bot.candidates||[];
+  if(d==="facil"){ if(Math.random()<0.7 || !cands.length) return randomValidGuess(); return cands[(Math.random()*cands.length)|0]; }
+  if(!cands.length) return randomValidGuess();
+  if(d==="dificil") return bestGuess(cands);
+  return cands[(Math.random()*cands.length)|0];   // normal: aleatorio entre consistentes
+}
+function setupBot(diff){
+  const all = buildCandidates();
+  S.bot = { difficulty: diff || (S.bot && S.bot.difficulty) || "normal",
+            secret: all[(Math.random()*all.length)|0], candidates: all, lastGuess:null };
+  S.opp = { name:"Bot", ready:true, present:true };
+}
+function startBotGame(diff){
+  S.mode="bot"; S.guesses=[]; S.oppLastGuess=null; S.secret=null; S.buffer=""; S.won=false; S.myTurn=false;
+  setupBot(diff);
+  goSecret();
+}
+// El bot juega su turno: intenta tu cifra y aprende de la pista recibida
+function botTurn(){
+  if(S.mode!=="bot" || S.phase!=="play") return;
+  const g = chooseBotGuess();
+  const hits = exactHits(g, S.secret);
+  S.bot.lastGuess = { guess:g, hits };
+  S.bot.candidates = (S.bot.candidates||[]).filter(c => exactHits(g,c) === hits);
+  S.oppLastGuess = { value:g, hits };
+  if(hits>0) alertHit(hits, hits===4);
+  showWarn(hits, "El Bot", hits===4);
+  if(hits===4){ endGame(false); return; }
+  S.myTurn = true;
+  drawPlay();
+}
+function showBotSetup(){
+  S.phase="botsetup";
+  render(`
+    <h2 class="phase-title">Contra el bot</h2>
+    <p class="phase-sub">Elige la dificultad. El bot también tiene una cifra secreta y competirá por descubrir la tuya.</p>
+    <button class="btn secondary" data-d="facil">${iconLabel('shield','Fácil')}</button>
+    <button class="btn green" data-d="normal">${iconLabel('target','Normal')}</button>
+    <button class="btn green" data-d="dificil">${iconLabel('warning','Difícil')}</button>
+    <button class="btn secondary" id="back">Atrás</button>
+  `);
+  screen.querySelectorAll("[data-d]").forEach(b=> b.onclick=()=>{ unlockAudio(); startBotGame(b.dataset.d); });
+  document.getElementById("back").onclick=showRoom;
 }
 
 // ================= Audio + aviso =================
@@ -456,6 +530,7 @@ function keypad(){
   return h+'</div>';
 }
 function statusText(){
+  if(S.mode==="bot"){ const d={facil:"Fácil",normal:"Normal",dificil:"Difícil"}[S.bot&&S.bot.difficulty]||""; return { cls:"on", txt:"Partida contra el Bot"+(d?" · "+d:"") }; }
   if(!S.connected) return { cls:"wait", txt:"Reconectando…" };
   if(S.opp.present) return { cls:"on", txt:"Conectado con "+(S.opp.name||"rival") };
   if(S.oppEverPresent) return { cls:"wait", txt:"Reconectando con "+(S.opp.name||"tu rival")+"…" };
@@ -564,19 +639,21 @@ function showName(){
 }
 
 function showRoom(){
-  S.phase="room";
+  S.phase="room"; S.mode=null;
   render(`
-    <h2 class="phase-title">Sala de juego</h2>
-    <p class="phase-sub">Crea una sala e invita a tu rival, o únete con un código.</p>
-    <button class="btn gold" id="create">${iconLabel('dice','Crear una sala')}</button>
+    <h2 class="phase-title">¿Cómo quieres jugar?</h2>
+    <p class="phase-sub">Contra el bot en este móvil, o contra otra persona en dos móviles.</p>
+    <button class="btn green" id="bot">${iconLabel('target','Jugar contra el bot')}</button>
+    <button class="btn secondary" id="create">${iconLabel('dice','Crear una sala')}</button>
     <button class="btn secondary" id="join">${iconLabel('key','Unirme con un código')}</button>
   `);
+  document.getElementById("bot").onclick=()=>{ unlockAudio(); showBotSetup(); };
   document.getElementById("create").onclick=()=>{ unlockAudio(); createRoom(); };
   document.getElementById("join").onclick=()=>{ unlockAudio(); joinScreen(); };
 }
 
 function createRoom(){
-  S.role="host"; S.room=randCode(); S.ready=false; S.opp={name:null,ready:false,present:false};
+  S.mode="online"; S.role="host"; S.room=randCode(); S.ready=false; S.opp={name:null,ready:false,present:false};
   S.phase="create-wait";
   drawCreateWait();
   connect(S.room, ()=>{ refreshStatus(); });
@@ -620,7 +697,7 @@ function joinScreen(){
 }
 
 function joinRoom(code){
-  S.role="guest"; S.room=code; S.ready=false; S.opp={name:null,ready:false,present:false};
+  S.mode="online"; S.role="guest"; S.room=code; S.ready=false; S.opp={name:null,ready:false,present:false};
   goSecret();                 // mostrar la pantalla primero (no depender de la red)
   connect(S.room, ()=>{});
 }
@@ -629,7 +706,7 @@ function goSecret(){ S.phase="secret"; S.buffer=""; drawSecret(); }
 function drawSecret(){
   render(`
     <h2 class="phase-title">Tu cifra secreta</h2>
-    <p class="phase-sub">Elige 4 dígitos <b>sin repetir</b>. El rival no la verá.</p>
+    <p class="phase-sub">Elige 4 dígitos <b>sin repetir</b>. ${S.mode==="bot"?"El bot":"El rival"} no la verá.</p>
     ${digitsRow(S.buffer)}
     <p class="msg" id="msg"></p>
     ${keypad()}
@@ -643,6 +720,7 @@ function submitSecret(){
   if(S.buffer.length<4){ msg.textContent="Faltan dígitos."; return; }
   if(!isValid(S.buffer)){ msg.textContent="Los 4 dígitos deben ser distintos."; return; }
   S.secret=S.buffer; S.buffer=""; S.ready=true;
+  if(S.mode==="bot"){ startPlay(); return; }   // contra el bot: empezar directamente (tú primero)
   publishPresence();
   S.phase="lobby";
   drawLobby();
@@ -667,7 +745,7 @@ function drawLobby(){
 
 function startPlay(){
   S.phase="play"; S.buffer="";
-  S.myTurn = (S.role==="host");
+  S.myTurn = (S.mode==="bot") ? true : (S.role==="host");   // contra el bot, tú empiezas
   drawPlay();
 }
 function drawPlay(){
@@ -693,7 +771,10 @@ function drawPlay(){
     const last = S.oppLastGuess
       ? `<div class="lasthit">Su último intento acertó <b>${S.oppLastGuess.hits}/4</b> de tus dígitos</div>`
       : "";
-    center = `<div class="handoff"><div class="icon">${ICON('clock',52,'#8e8e93')}</div><p class="phase-sub">Turno de <b>${S.opp.name||"tu rival"}</b>.<br>Está intentando adivinar tu cifra…</p>${last}</div>`;
+    const txt = S.mode==="bot"
+      ? `El <b>Bot</b> está pensando su intento…`
+      : `Turno de <b>${S.opp.name||"tu rival"}</b>.<br>Está intentando adivinar tu cifra…`;
+    center = `<div class="handoff"><div class="icon">${ICON('clock',52,'#8e8e93')}</div><p class="phase-sub">${txt}</p>${last}</div>`;
   }
 
   render(`
@@ -716,6 +797,14 @@ function submitGuess(){
   if(S.buffer.length<4){ msg.textContent="Faltan dígitos."; return; }
   if(!isValid(S.buffer)){ msg.textContent="Los 4 dígitos deben ser distintos."; return; }
   const value=S.buffer; S.buffer="";
+  if(S.mode==="bot"){
+    const hits=exactHits(value, S.bot.secret);
+    S.guesses.push({ guess:value, hits });
+    if(hits===4){ endGame(true); return; }        // has descubierto la cifra del bot
+    S.myTurn=false; drawPlay();
+    setTimeout(botTurn, 850 + (Math.random()*500|0));  // el bot "piensa"
+    return;
+  }
   S.waitingResult=true; S.myTurn=false;
   sendEvent({ t:"guess", value });
   drawPlay();
@@ -745,6 +834,7 @@ function doRematch(fromOpponent){
   S.secret=null; S.buffer=""; S.guesses=[]; S.ready=false; S.won=false;
   S.waitingResult=false; S.myTurn=false; S.oppLastGuess=null;
   S.opp.ready=false;
+  if(S.mode==="bot"){ setupBot(); goSecret(); return; }   // nueva cifra del bot, misma dificultad
   publishPresence();
   goSecret();
 }
@@ -769,6 +859,7 @@ function leaveToMenu(){
   S.client=null; S.connected=false; S.role=null; S.room=null; S.secret=null;
   S.buffer=""; S.guesses=[]; S.ready=false; S.opp={name:null,ready:false,present:false};
   S.waitingResult=false; S.myTurn=false; S.oppLastGuess=null;
+  S.mode=null; S.bot=null;
   showRoom();
 }
 
