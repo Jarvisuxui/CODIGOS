@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>CÓDIGOS</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.14.1/mqtt.min.js"></script>
 <style>
@@ -23,9 +23,11 @@
       linear-gradient(180deg,#f7f7fb 0%, #eef0f5 100%);
     background-attachment:fixed;
     min-height:100vh; min-height:100dvh;
-    display:flex; justify-content:center; padding:12px; overscroll-behavior:none;
+    display:flex; justify-content:center; overscroll-behavior:none;
+    padding:calc(10px + env(safe-area-inset-top)) 12px calc(10px + env(safe-area-inset-bottom));
     -webkit-font-smoothing:antialiased;
   }
+  button{touch-action:manipulation;-webkit-user-select:none;user-select:none;}
   .app{width:100%; max-width:480px; margin:0 auto;}
   .card{
     background:var(--card);
@@ -204,6 +206,14 @@
   .fade{animation:fade .3s ease;}
   @keyframes fade{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
   a{color:var(--accent);}
+
+  /* Micro-animación al teclear un dígito */
+  .digit.filled.pop{animation:digPop .16s ease;}
+  @keyframes digPop{0%{transform:scale(1.16);}100%{transform:none;}}
+
+  /* Confeti de victoria */
+  .conf{position:fixed;top:-14px;z-index:1001;border-radius:2px;pointer-events:none;animation:confFall linear forwards;}
+  @keyframes confFall{to{transform:translateY(105vh) rotate(720deg);opacity:.85;}}
 
   /* Halo blanco difuminado: el texto despeja los doodles del fondo (no chocan) */
   h1,.subtitle,.phase-title,.phase-sub,.hint,.empty,.status,.handoff .who,.end .big{
@@ -766,6 +776,7 @@ function digitsRow(value, secret){
   for(let i=0;i<4;i++){
     const has=i<value.length; let cls="digit";
     if(has) cls+=" filled";
+    if(has && i===value.length-1) cls+=" pop";
     if(i===value.length) cls+=" active";
     let ch = has ? (secret ? "•" : value[i]) : "";
     html+=`<div class="${cls}${secret?' secret':''}">${ch}</div>`;
@@ -864,9 +875,10 @@ function showWelcome(){
     ${inviteBanner}
     <div class="rules">
       Cada uno elige en secreto una cifra de <b>4 dígitos sin repetir</b>. Por turnos
-      intentáis adivinar la del rival. La única pista: <b>cuántos dígitos acertaste en su
-      posición exacta</b>. Cuando aciertas, el <b>móvil del rival suena y destella</b>.
-      <b>Gana quien descubra primero la cifra del otro.</b>
+      intentáis adivinar la del rival; la única pista: <b>cuántos dígitos acertaste en su
+      posición exacta</b>. Reloj tipo ajedrez: <b>2:00 por jugador</b> y <b>+20s por cada
+      dígito acertado</b>. Cuando aciertas, el móvil del rival <b>suena y destella</b>.
+      <b>Gana quien descubra la cifra del otro… o quien no agote su reloj.</b>
     </div>
     <button class="btn green" id="go">${INVITE ? "Entrar a la sala" : "Jugar"}</button>
   `);
@@ -997,7 +1009,7 @@ function drawLobby(){
 }
 
 // ================= Reloj de ajedrez =================
-const CLOCK_START = 300000;   // 5:00 por jugador
+const CLOCK_START = 120000;   // 2:00 por jugador
 const BONUS_MS = 20000;       // +20s por dígito acertado
 function fmtClock(ms){ ms=Math.max(0,ms||0); const s=Math.ceil(ms/1000); const m=(s/60)|0; const ss=s%60; return m+":"+(ss<10?"0":"")+ss; }
 function startClock(){ stopClock(); S._lastTick=performance.now(); S._clockInt=setInterval(clockTick,200); }
@@ -1026,8 +1038,8 @@ function broadcastClock(){
 function updateClockUI(){
   if(!S.clock) return;
   const me=document.getElementById("clk-me"), op=document.getElementById("clk-opp");
-  if(me){ me.textContent=fmtClock(S.clock.me); const p=me.parentElement; p.classList.toggle('low',S.clock.me<30000); p.classList.toggle('act',S.myTurn); }
-  if(op){ op.textContent=fmtClock(S.clock.opp); const p=op.parentElement; p.classList.toggle('low',S.clock.opp<30000); p.classList.toggle('act',!S.myTurn); }
+  if(me){ me.textContent=fmtClock(S.clock.me); const p=me.parentElement; p.classList.toggle('low',S.clock.me<20000); p.classList.toggle('act',S.myTurn); }
+  if(op){ op.textContent=fmtClock(S.clock.opp); const p=op.parentElement; p.classList.toggle('low',S.clock.opp<20000); p.classList.toggle('act',!S.myTurn); }
 }
 function showBonus(which, sec){
   const el=document.getElementById(which==='me'?"clk-me":"clk-opp");
@@ -1110,7 +1122,20 @@ function submitGuess(){
   drawPlay();
 }
 
-function endGame(won, reason){ stopClock(); S.phase="end"; S.won=won; S.endReason=reason||"guess"; drawEnd(); }
+function confetti(){
+  const colors=['#34c759','#ffb800','#ff3b30','#5ac8fa','#ff9f0a','#af52de'];
+  for(let i=0;i<46;i++){
+    const s=document.createElement('div'); s.className='conf';
+    s.style.left=(Math.random()*100)+'%';
+    s.style.background=colors[i%colors.length];
+    const d=6+Math.random()*6; s.style.width=d+'px'; s.style.height=(d*0.6)+'px';
+    s.style.animationDelay=(Math.random()*0.7)+'s';
+    s.style.animationDuration=(2.1+Math.random()*1.5)+'s';
+    document.body.appendChild(s);
+    setTimeout(()=>{ try{ s.remove(); }catch(e){} }, 4600);
+  }
+}
+function endGame(won, reason){ stopClock(); S.phase="end"; S.won=won; S.endReason=reason||"guess"; drawEnd(); if(won) confetti(); }
 function drawEnd(){
   const won=S.won; const r=S.endReason||"guess"; const opp=S.opp.name||"tu rival";
   let big, sub;
