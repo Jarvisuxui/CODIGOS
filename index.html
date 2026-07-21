@@ -1229,22 +1229,28 @@ function makeBgPattern(){
     '9':`M8.6 17.3a4.3 4.1 0 0 0 3.9 2.6C15.2 19.9 17.1 17 17.1 12.4M17.1 12.4a4.4 4.2 0 1 0-4.6 4.2c1.9 0 3.6-1.1 4.4-2.8`
   };
   const seq=['clock','7','hand','heart','robot','3','people','star','phone','9','globe','key','1','smiley','target','fire','spark','5','versus','dice','crown','8','bolt','hand','2','trophy','lupa','phone','0','heart','people','robot','4','star','globe','6','smiley','key','fire','1','hand','clock','9','crown','phone','versus','bolt','people','3','lupa','dice','heart','7','globe','star','5','robot','smiley','2','key','8','fire','trophy','hand','4','bolt','people','0','crown','globe','6','lupa','lock','heart','spark'];
-  const sizePool=[14,17,20,23];
-  const cols=14, rows=14, m=14, step=26;         // rejilla muy apretada (mínimo aire, estilo WhatsApp)
+  const sizePool=[11,14,17,20,23,26];            // más variación de tamaño
+  const step=36, stepY=31, cols=11, rows=13;     // rejilla escalonada (hexagonal): MISMO espacio entre todos
+  const T=cols*step, TY=rows*stepY, R=15;
+  function emit(x,y,g,rot,sc,sw){
+    return `<g transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${rot}) scale(${sc}) translate(-12 -12)" fill="none" stroke="${c}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round">${g}</g>`;
+  }
   let body="", k=0;
   for(let r=0;r<rows;r++) for(let col=0;col<cols;col++){
     const it=seq[k%seq.length]; k++;
     const g=dood[it]||digitP[it]; if(!g) continue;
-    const x=m+col*step+((r%2)?9:-7), y=m+r*step+((col%2)?7:-6);       // jitter alterno
-    const rot=(((r*5+col*11)%11)-5)*6;                                // -30..30
-    let sz=sizePool[(r*3+col*7+k)%sizePool.length];                   // tamaños variados
-    if(it==='versus') sz=Math.max(sz,20);
-    if(it==='spark'||it==='star') sz=Math.min(sz,15);
-    const sc=sz/24, sw=(1.3/sc).toFixed(2);                           // grosor de línea constante (~1.3) pese al tamaño
-    body+=`<g transform="translate(${x} ${y}) rotate(${rot}) scale(${sc.toFixed(3)}) translate(-12 -12)" fill="none" stroke="${c}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round">${g}</g>`;
+    let x=(col*step+(r%2?step/2:0))%T, y=r*stepY;                     // filas impares desplazadas (hexagonal)
+    const rot=(((r*7+col*13)%11)-5)*6;                                // -30..30
+    let sz=sizePool[(r*3+col*5+k)%sizePool.length];                   // tamaños variados
+    if(it==='versus') sz=Math.max(sz,22);
+    if(it==='spark'||it==='star') sz=Math.min(sz,16);
+    const sc=(sz/24).toFixed(3), sw=(1.3/(sz/24)).toFixed(2);         // grosor de línea constante (~1.3)
+    // envoltura toroidal -> el mosaico repite sin costuras
+    const xs=[x]; if(x<R) xs.push(x+T); else if(x>T-R) xs.push(x-T);
+    const ys=[y]; if(y<R) ys.push(y+TY); else if(y>TY-R) ys.push(y-TY);
+    for(const xx of xs) for(const yy of ys) body+=emit(xx,yy,g,rot,sc,sw);
   }
-  const T=m*2+(cols-1)*step;                      // 366
-  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${T}" height="${T}" viewBox="0 0 ${T} ${T}">${body}</svg>`;
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${T}" height="${TY}" viewBox="0 0 ${T} ${TY}">${body}</svg>`;
   return "data:image/svg+xml,"+encodeURIComponent(svg);
 }
 function applyBgPattern(){
