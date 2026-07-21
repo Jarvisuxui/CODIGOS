@@ -50,6 +50,12 @@
     text-shadow:0 0 9px rgba(255,80,235,.95), 0 0 24px rgba(255,60,220,.75), 0 3px 0 rgba(0,0,0,.4);
   }
   h1 .em{color:var(--mag-l); text-shadow:0 0 12px rgba(255,90,236,1), 0 0 30px rgba(255,60,220,.85);}
+  h1 .ch{display:inline-block;min-width:.6em;text-align:center;}
+  h1 .ch.num{color:var(--cyan-l);-webkit-text-stroke:1.5px #08303a;text-shadow:0 0 10px rgba(55,230,255,.95),0 0 22px rgba(55,230,255,.6);}
+  h1 .ch.lock{color:#fff;}
+  h1 .ch.lock.isem{color:var(--mag-l);text-shadow:0 0 12px rgba(255,90,236,1),0 0 30px rgba(255,60,220,.85);}
+  h1 .ch.pop{animation:chpop .22s ease;}
+  @keyframes chpop{0%{transform:translateY(-5px) scale(1.28);}60%{transform:translateY(0) scale(.96);}100%{transform:none;}}
   .subtitle{text-align:center;color:var(--muted);font-size:14px;margin:0 0 16px;font-weight:600;}
   .phase-title{font-family:var(--disp);font-size:26px;text-align:center;margin:0 0 6px;color:#fff;letter-spacing:.5px;text-shadow:0 0 10px rgba(255,80,235,.6),0 2px 0 rgba(0,0,0,.4);}
   .phase-sub{color:var(--muted);font-size:14.5px;text-align:center;margin:0 0 16px;line-height:1.5;font-weight:500;}
@@ -509,12 +515,37 @@ function bindKeypad(redraw, onOk){
 }
 
 // ================= Pantallas =================
+// Animación del título: las 7 casillas giran como dígitos y se bloquean
+// una a una (de izquierda a derecha) hasta formar CÓDIGOS.
+function animateTitle(){
+  const el = document.getElementById("title");
+  if(!el) return;
+  const target = ["C","Ó","D","I","G","O","S"];
+  const emStart = 2; // a partir de aquí, color magenta (como el "DIGOS")
+  el.innerHTML = target.map((c,i)=>`<span class="ch num${i>=emStart?' isem':''}">0</span>`).join("");
+  const spans = [...el.querySelectorAll(".ch")];
+  const locked = new Array(target.length).fill(false);
+  const scr = setInterval(()=>{
+    for(let i=0;i<spans.length;i++){ if(!locked[i]) spans[i].textContent = String((Math.random()*10)|0); }
+  }, 55);
+  const base = 300, step = 155;
+  target.forEach((c,i)=>{
+    setTimeout(()=>{
+      locked[i] = true;
+      spans[i].textContent = c;
+      spans[i].classList.remove("num");
+      spans[i].classList.add("lock","pop");
+      setTimeout(()=>spans[i].classList.remove("pop"), 230);
+      if(i === target.length-1) clearInterval(scr);
+    }, base + i*step);
+  });
+}
 function showWelcome(){
   S.phase="welcome";
   const inviteBanner = INVITE ? `<div class="invite">Te han invitado a la sala <b>${INVITE}</b></div>` : "";
   render(`
     <div style="text-align:center;margin-bottom:2px">${ICON('target',52,'#ff5cec')}</div>
-    <h1>CÓ<span class="em">DIGOS</span></h1>
+    <h1 id="title" aria-label="CÓDIGOS"></h1>
     <p class="subtitle">Duelo online · dos jugadores, dos móviles</p>
     ${inviteBanner}
     <div class="rules">
@@ -526,6 +557,7 @@ function showWelcome(){
     <button class="btn green" id="go">${INVITE ? "Entrar a la sala" : "Jugar"}</button>
   `);
   document.getElementById("go").onclick = ()=>{ unlockAudio(); showName(); };
+  animateTitle();
 }
 
 function showName(){
