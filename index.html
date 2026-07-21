@@ -520,7 +520,11 @@ function animateTitle(){
       spans[i].classList.remove("num");
       spans[i].classList.add("lock","pop");
       setTimeout(()=>spans[i].classList.remove("pop"), 230);
-      if(i === target.length-1) clearInterval(scr);
+      if(i === target.length-1){
+        clearInterval(scr);
+        // Al terminar, texto normal → kerning nativo de la fuente (adiós casillas de ancho fijo)
+        setTimeout(()=>{ el.innerHTML = 'CÓ<span class="em">DIGOS</span>'; }, 250);
+      }
     }, base + i*step);
   });
 }
