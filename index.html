@@ -42,12 +42,12 @@
     text-align:center; margin:2px 0 4px; color:var(--label); letter-spacing:-.02em;
   }
   h1 .em{color:var(--label);}
-  h1 .ch{display:inline-block;text-align:center;}
-  h1 .ch.num{color:var(--accent);}
-  h1 .ch.lock{color:var(--label);}
-  h1 .ch.lock.isem{color:var(--label);}
-  h1 .ch.pop{animation:chpop .22s ease;}
-  @keyframes chpop{0%{transform:translateY(-4px) scale(1.18);}60%{transform:translateY(0) scale(.98);}100%{transform:none;}}
+  h1 .lt{display:inline-block;animation:ltIn .55s cubic-bezier(.25,1.5,.4,1) both;}
+  @keyframes ltIn{0%{transform:translateY(16px) scale(.5);opacity:0;}62%{transform:translateY(-3px) scale(1.08);opacity:1;}100%{transform:none;opacity:1;}}
+  .logo-pop{animation:ltIn .55s cubic-bezier(.25,1.5,.4,1) both;}
+  .digits.demo{margin:14px 0 18px;}
+  .digits.demo .digit{width:50px;height:62px;font-size:28px;border-radius:14px;}
+  .digit.hit{border-color:var(--accent);background:#eafbef;color:var(--accent);}
   .subtitle{text-align:center;color:var(--label3);font-size:15px;margin:0 0 20px;font-weight:500;letter-spacing:-.01em;}
   .phase-title{font-family:var(--disp);font-weight:700;font-size:26px;text-align:center;margin:0 0 6px;color:var(--label);letter-spacing:-.02em;}
   .phase-sub{color:var(--label3);font-size:15px;text-align:center;margin:0 0 20px;line-height:1.45;font-weight:400;}
@@ -211,7 +211,7 @@
   a{color:var(--accent);}
 
   /* Micro-animación al teclear un dígito */
-  .digit.filled.pop{animation:digPop .16s ease;}
+  .digit.pop{animation:digPop .16s ease;}
   @keyframes digPop{0%{transform:scale(1.16);}100%{transform:none;}}
 
   /* Confeti de victoria */
@@ -839,47 +839,36 @@ function bindKeypad(redraw, onOk){
 }
 
 // ================= Pantallas =================
-// Animación del título: las 7 casillas giran como dígitos y se bloquean
-// una a una (de izquierda a derecha) hasta formar CÓDIGOS.
-function animateTitle(){
-  const el = document.getElementById("title");
-  if(!el) return;
-  const target = ["C","Ó","D","I","G","O","S"];
-  const emStart = 2;
-  // 1) Montar con las letras FINALES y fijar el ancho real de cada una:
-  //    así el título ocupa lo mismo durante y después de la animación (sin salto).
-  el.innerHTML = target.map((c,i)=>`<span class="ch lock${i>=emStart?' isem':''}">${c}</span>`).join("");
-  const spans = [...el.querySelectorAll(".ch")];
-  spans.forEach(s=>{ s.style.width = s.getBoundingClientRect().width.toFixed(2)+"px"; });
-  // 2) Arrancar el barrido de dígitos dentro de esos anchos fijos
-  spans.forEach(s=>{ s.classList.remove("lock"); s.classList.add("num"); s.textContent="0"; });
-  const locked = new Array(target.length).fill(false);
-  const scr = setInterval(()=>{
-    for(let i=0;i<spans.length;i++){ if(!locked[i]) spans[i].textContent = String((Math.random()*10)|0); }
-  }, 55);
-  const base = 300, step = 155;
-  target.forEach((c,i)=>{
-    setTimeout(()=>{
-      locked[i] = true;
-      spans[i].textContent = c;
-      spans[i].classList.remove("num");
-      spans[i].classList.add("lock","pop");
-      setTimeout(()=>spans[i].classList.remove("pop"), 230);
-      if(i === target.length-1){
-        clearInterval(scr);
-        // Al terminar, texto normal → kerning nativo de la fuente (adiós casillas de ancho fijo)
-        setTimeout(()=>{ el.innerHTML = 'CÓ<span class="em">DIGOS</span>'; }, 250);
-      }
-    }, base + i*step);
-  });
+// Portada: título con rebote letra a letra (solo transforms → nunca se descoloca)
+// y mini-demo del juego: 4 casillas girando dígitos donde a veces una "acierta".
+function startDemo(){
+  stopDemo();
+  const cells=[...document.querySelectorAll('#demoTiles .digit')];
+  if(!cells.length) return;
+  let lockIdx=-1, t=0;
+  S._demoInt=setInterval(()=>{
+    if(!cells[0].isConnected){ stopDemo(); return; }
+    t++;
+    cells.forEach((c,i)=>{ if(i!==lockIdx) c.textContent=(Math.random()*10)|0; });
+    if(t%13===0){                       // cada ~1.3s una casilla "acierta"
+      if(lockIdx>=0) cells[lockIdx].classList.remove('hit');
+      lockIdx=(Math.random()*4)|0;
+      const c=cells[lockIdx];
+      c.classList.add('hit','pop');
+      setTimeout(()=>{ try{ c.classList.remove('pop'); }catch(e){} },200);
+    }
+  },100);
 }
+function stopDemo(){ if(S._demoInt){ clearInterval(S._demoInt); S._demoInt=null; } }
 function showWelcome(){
   S.phase="welcome";
   const inviteBanner = INVITE ? `<div class="invite">Te han invitado a la sala <b>${INVITE}</b></div>` : "";
+  const titleHtml = "CÓDIGOS".split("").map((c,i)=>`<span class="lt" style="animation-delay:${90+70*i}ms">${c}</span>`).join("");
   render(`
-    <div style="text-align:center;margin-bottom:6px">${ICON('target',48,'#34C759')}</div>
-    <h1 id="title" aria-label="CÓDIGOS"></h1>
+    <div class="logo-pop" style="text-align:center;margin-bottom:6px">${ICON('target',48,'#34C759')}</div>
+    <h1 aria-label="CÓDIGOS">${titleHtml}</h1>
     <p class="subtitle">Duelo online · dos jugadores, dos móviles</p>
+    <div class="digits demo" id="demoTiles"><div class="digit">7</div><div class="digit">0</div><div class="digit">4</div><div class="digit">2</div></div>
     ${inviteBanner}
     <div class="rules">
       <div class="rule-row">${ICON('lock',22,'#34C759')}<span>Elige una <b>cifra secreta</b> de 4 dígitos distintos.</span></div>
@@ -889,8 +878,8 @@ function showWelcome(){
     </div>
     <button class="btn green" id="go">${INVITE ? "Entrar a la sala" : "Jugar"}</button>
   `);
-  document.getElementById("go").onclick = ()=>{ unlockAudio(); showName(); };
-  animateTitle();
+  document.getElementById("go").onclick = ()=>{ unlockAudio(); stopDemo(); showName(); };
+  startDemo();
 }
 
 function showName(){
