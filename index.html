@@ -550,9 +550,14 @@ function miniToast(msg){
 }
 async function shareInvite(code){
   const url = inviteUrl(code);
-  const data = { title:"CÓDIGOS", text:`¡Te reto en CÓDIGOS! Entra a mi sala (${code}):`, url };
-  try{ if(navigator.share){ await navigator.share(data); } else { copyText(url); } }
-  catch(e){}
+  const text = `🎯 ¿Puedes descifrar mi código antes de que yo descifre el tuyo? Te reto en CÓDIGOS (sala ${code}):`;
+  const data = { title:"CÓDIGOS", text, url };
+  try{
+    if(navigator.share){ await navigator.share(data); return; }
+  }catch(e){ if(e && e.name==="AbortError") return; }
+  // Sin hoja de compartir nativa (normalmente escritorio): abrimos WhatsApp directamente
+  try{ window.open("https://wa.me/?text="+encodeURIComponent(text+" "+url), "_blank"); }
+  catch(e){ copyText(url); }
 }
 function copyText(txt){
   if(navigator.clipboard && navigator.clipboard.writeText){
@@ -911,9 +916,9 @@ function showRoom(){
   S.phase="room"; S.mode=null;
   render(`
     <h2 class="phase-title">¿Cómo quieres jugar?</h2>
-    <p class="phase-sub">Partida rápida contra el mundo, con un amigo por código, o contra el bot.</p>
+    <p class="phase-sub">Partida rápida contra el mundo, reta a un amigo, o juega contra el bot.</p>
     <button class="btn green" id="quick">${iconLabel('globe','Partida rápida')}</button>
-    <button class="btn secondary" id="create">${iconLabel('people','Crear una sala')}</button>
+    <button class="btn secondary" id="create">${iconLabel('people','Retar a un amigo')}</button>
     <button class="btn secondary" id="join">${iconLabel('key','Unirme con un código')}</button>
     <button class="btn secondary" id="bot">${iconLabel('robot','Jugar contra un bot')}</button>
   `);
@@ -932,10 +937,10 @@ function createRoom(){
 function drawCreateWait(){
   const url = inviteUrl(S.room);
   render(`
-    <h2 class="phase-title">¡Sala creada!</h2>
-    <p class="phase-sub">Invita a tu rival — no tendrá que escribir el código.</p>
+    <h2 class="phase-title">¡Listo para el duelo!</h2>
+    <p class="phase-sub">Manda el reto por WhatsApp — tu amigo entra con un toque, sin escribir el código.</p>
     <div class="codebox"><div class="lab">Código de sala</div><div class="code">${S.room}</div></div>
-    <button class="btn green" id="share">${iconLabel('share','Enviar invitación')}</button>
+    <button class="btn green" id="share">${iconLabel('share','Retar por WhatsApp')}</button>
     <button class="btn secondary" id="copy">${iconLabel('link','Copiar enlace')}</button>
     <p class="hint">O dile el código <b>${S.room}</b> para que lo escriba a mano.</p>
     ${statusBar()}
