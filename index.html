@@ -223,7 +223,8 @@ const S = {
   opp: { name: null, ready: false, present: false },
   ready: false, client: null, connected: false, waitingResult: false,
   oppLastGuess: null, usedFallback: false, oppEverPresent: false,
-  mode: null, bot: null   // mode: "online" | "bot"
+  mode: null, bot: null,   // mode: "online" | "bot"
+  quick: false, lobby: null, mm: null
 };
 
 const screen = document.getElementById("screen");
@@ -310,6 +311,131 @@ function showBotSetup(){
   `);
   screen.querySelectorAll("[data-d]").forEach(b=> b.onclick=()=>{ unlockAudio(); startBotGame(b.dataset.d); });
   document.getElementById("back").onclick=showRoom;
+}
+
+// ================= Partida rápida (emparejamiento con el mundo) =================
+// Algoritmo tolerante a carreras (ranura retenida + handshake claim/accept), probado por separado.
+function makeMatchmaker(mm){
+  const SLOT="slot";
+  const decideMs = mm.decideMs || 1300;
+  const claimMs  = mm.claimMs  || 2500;
+  let state="init", myRoom=null, pendingHost=null, acceptedGuest=null, timers=[];
+  let deadHosts=new Set();
+  function T(ms,fn){ const id=mm.setTimer(ms,fn); timers.push(id); return id; }
+  function clearTimers(){ timers.forEach(id=>mm.clearTimer(id)); timers=[]; }
+  function begin(){
+    if(state==="cancelled") return;
+    state="deciding"; pendingHost=null;
+    mm.sub(SLOT); mm.onStatus("Buscando rival…");
+    T(decideMs, ()=>{ if(state==="deciding") becomeHost(); });
+  }
+  function becomeHost(){
+    state="host"; acceptedGuest=null; myRoom=mm.randRoom();
+    mm.sub("claim/"+mm.cid);
+    mm.pub(SLOT, JSON.stringify({cid:mm.cid, room:myRoom}), true);
+    mm.onHostWaiting(myRoom);
+  }
+  function becomeGuestOf(host){
+    if(state==="done"||state==="cancelled") return;
+    state="claiming"; pendingHost=host;
+    mm.sub("accept/"+host.cid);
+    mm.pub("claim/"+host.cid, JSON.stringify({cid:mm.cid, room:host.room}), false);
+    mm.onStatus("Rival encontrado, conectando…");
+    T(claimMs, ()=>{ if(state==="claiming"){ deadHosts.add(String(host.cid)); begin(); } });
+  }
+  function onMessage(topic, payload){
+    if(state==="done"||state==="cancelled") return;
+    if(topic===SLOT){
+      if(!payload) return;
+      let d; try{ d=JSON.parse(payload); }catch(e){ return; }
+      if(!d || d.cid===mm.cid) return;
+      if(deadHosts.has(String(d.cid))) return;
+      if(state==="deciding"){ clearTimers(); becomeGuestOf(d); }
+      else if(state==="host"){
+        if(String(d.cid) < String(mm.cid)){
+          mm.pub(SLOT, "", true); mm.onHostCancel(); clearTimers(); becomeGuestOf(d);
+        }
+      }
+      return;
+    }
+    if(topic==="claim/"+mm.cid && state==="host"){
+      let d; try{ d=JSON.parse(payload); }catch(e){ return; }
+      if(!d || acceptedGuest) return;
+      acceptedGuest=d.cid;
+      mm.pub(SLOT, "", true);
+      mm.pub("accept/"+mm.cid, JSON.stringify({cid:d.cid}), false);
+      return;
+    }
+    if(state==="claiming" && pendingHost && topic==="accept/"+pendingHost.cid){
+      let d; try{ d=JSON.parse(payload); }catch(e){ return; }
+      if(d && d.cid===mm.cid){ state="done"; clearTimers(); mm.onGuest(pendingHost.room); }
+      return;
+    }
+  }
+  function matched(){ if(state==="done") return; state="done"; clearTimers(); mm.pub(SLOT,"",true); }
+  function cancel(){ state="cancelled"; clearTimers(); try{ mm.pub(SLOT,"",true); }catch(e){} }
+  return { begin, onMessage, matched, cancel };
+}
+
+const LOBBY_ROOT = TOPIC_ROOT + "/lobby/";
+function closeLobby(){ try{ if(S.lobby) S.lobby.end(true); }catch(e){} S.lobby=null; }
+function quickMatch(){
+  S.mode="online"; S.quick=true; S.phase="searching";
+  drawSearching("Conectando…");
+  if(typeof mqtt==="undefined"){ drawSearching("No se pudo cargar la red. Reintenta."); return; }
+  const url = S.usedFallback ? BROKER_FALLBACK : BROKER;
+  let lob;
+  try{ lob = mqtt.connect(url, {clientId:"lob_"+S.cid, clean:true, reconnectPeriod:2500, connectTimeout:8000, keepalive:30}); }
+  catch(e){ drawSearching("No se pudo conectar. Reintenta."); return; }
+  S.lobby = lob;
+  const mm = makeMatchmaker({
+    cid: S.cid,
+    pub:(t,p,r)=>{ try{ lob.publish(LOBBY_ROOT+t, p, {qos:0, retain:!!r}); }catch(e){} },
+    sub:(t)=>{ try{ lob.subscribe(LOBBY_ROOT+t, {qos:0}); }catch(e){} },
+    randRoom: randCode,
+    setTimer:(ms,fn)=>setTimeout(fn,ms),
+    clearTimer:(id)=>clearTimeout(id),
+    onStatus:(txt)=>{ if(S.phase==="searching") drawSearching(txt); },
+    onHostWaiting:(room)=>startHostFromMatch(room),
+    onHostCancel:()=>teardownHostGame(),
+    onGuest:(room)=>{ closeLobby(); joinRoom(room); }
+  });
+  S.mm = mm;
+  lob.on("connect", ()=>{ if(S.quick && S.phase==="searching") mm.begin(); });
+  lob.on("message", (topic,pl)=>{ if(topic.indexOf(LOBBY_ROOT)===0) mm.onMessage(topic.slice(LOBBY_ROOT.length), pl.toString()); });
+  lob.on("error", ()=>{});
+}
+function startHostFromMatch(room){
+  S.role="host"; S.room=room; S.ready=false; S.opp={name:null,ready:false,present:false};
+  S.phase="create-wait";
+  drawSearching("Buscando rival…");
+  connect(S.room, ()=>{});
+}
+function teardownHostGame(){
+  try{ clearPresence(); }catch(e){}
+  try{ if(S.client) S.client.end(true); }catch(e){}
+  S.client=null; S.connected=false; S.role=null; S.room=null; S.opp={name:null,ready:false,present:false};
+  S.phase="searching";
+}
+function drawSearching(txt){
+  render(`
+    <div class="handoff">
+      <div class="icon">${ICON('signal',52,'#34C759')}</div>
+      <div class="phase-title">Partida rápida</div>
+      <p class="phase-sub">${txt||"Buscando rival…"}</p>
+      <p class="hint">Te emparejamos con cualquiera que esté buscando ahora mismo.</p>
+    </div>
+    <button class="btn secondary" id="cancel">Cancelar</button>
+  `);
+  document.getElementById("cancel").onclick=cancelQuick;
+}
+function cancelQuick(){
+  try{ if(S.mm) S.mm.cancel(); }catch(e){}
+  closeLobby();
+  try{ if(S.client) S.client.end(true); }catch(e){}
+  S.client=null; S.connected=false; S.mm=null; S.quick=false; S.mode=null; S.role=null; S.room=null;
+  S.opp={name:null,ready:false,present:false};
+  showRoom();
 }
 
 // ================= Audio + aviso =================
@@ -466,7 +592,10 @@ function onPresenceUpdate(){
   if(S.phase === "lobby"){
     if(S.ready && S.opp.present && S.opp.ready){ startPlay(); } else drawLobby();
   } else if(S.phase === "create-wait"){
-    if(S.opp.present){ goSecret(); }
+    if(S.opp.present){
+      if(S.quick && S.mm){ try{ S.mm.matched(); }catch(e){} closeLobby(); S.mm=null; }
+      goSecret();
+    }
   }
   refreshStatus();
 }
@@ -663,12 +792,14 @@ function showRoom(){
   S.phase="room"; S.mode=null;
   render(`
     <h2 class="phase-title">¿Cómo quieres jugar?</h2>
-    <p class="phase-sub">Contra el bot en este móvil, o contra otra persona en dos móviles.</p>
+    <p class="phase-sub">Contra el bot, contra el mundo, o con un amigo por código.</p>
     <button class="btn green" id="bot">${iconLabel('target','Jugar contra el bot')}</button>
+    <button class="btn" id="quick">${iconLabel('signal','Partida rápida (mundo)')}</button>
     <button class="btn secondary" id="create">${iconLabel('dice','Crear una sala')}</button>
     <button class="btn secondary" id="join">${iconLabel('key','Unirme con un código')}</button>
   `);
   document.getElementById("bot").onclick=()=>{ unlockAudio(); showBotSetup(); };
+  document.getElementById("quick").onclick=()=>{ unlockAudio(); quickMatch(); };
   document.getElementById("create").onclick=()=>{ unlockAudio(); createRoom(); };
   document.getElementById("join").onclick=()=>{ unlockAudio(); joinScreen(); };
 }
@@ -933,12 +1064,14 @@ function showInfo(title, sub){
 
 function leaveToMenu(){
   stopClock();
+  try{ if(S.mm) S.mm.cancel(); }catch(e){}
+  closeLobby();
   try{ clearPresence(); }catch(e){}
   try{ if(S.client) S.client.end(true); }catch(e){}
   S.client=null; S.connected=false; S.role=null; S.room=null; S.secret=null;
   S.buffer=""; S.guesses=[]; S.ready=false; S.opp={name:null,ready:false,present:false};
   S.waitingResult=false; S.myTurn=false; S.oppLastGuess=null;
-  S.mode=null; S.bot=null;
+  S.mode=null; S.bot=null; S.quick=false; S.mm=null;
   showRoom();
 }
 
