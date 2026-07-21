@@ -112,6 +112,9 @@
     margin-bottom:4px;font-weight:400;
   }
   .rules b{color:var(--label);font-weight:600;}
+  .rule-row{display:flex;align-items:center;gap:13px;padding:7px 0;text-align:left;}
+  .rule-row svg{flex:none;}
+  .rule-row span{flex:1;line-height:1.4;}
 
   .invite{
     background:rgba(52,199,89,.10);color:var(--accent);border-radius:16px;
@@ -874,11 +877,10 @@ function showWelcome(){
     <p class="subtitle">Duelo online · dos jugadores, dos móviles</p>
     ${inviteBanner}
     <div class="rules">
-      Cada uno elige en secreto una cifra de <b>4 dígitos sin repetir</b>. Por turnos
-      intentáis adivinar la del rival; la única pista: <b>cuántos dígitos acertaste en su
-      posición exacta</b>. Reloj tipo ajedrez: <b>2:00 por jugador</b> y <b>+20s por cada
-      dígito acertado</b>. Cuando aciertas, el móvil del rival <b>suena y destella</b>.
-      <b>Gana quien descubra la cifra del otro… o quien no agote su reloj.</b>
+      <div class="rule-row">${ICON('lock',22,'#34C759')}<span>Elige una <b>cifra secreta</b> de 4 dígitos distintos.</span></div>
+      <div class="rule-row">${ICON('target',22,'#34C759')}<span>Por turnos, intenta adivinar la del rival: te decimos <b>cuántos dígitos clavaste</b>.</span></div>
+      <div class="rule-row">${ICON('clock',22,'#34C759')}<span><b>2:00</b> de reloj — cada acierto suma <b>+20s</b>.</span></div>
+      <div class="rule-row">${ICON('trophy',22,'#34C759')}<span><b>Gana</b> quien descubra antes la cifra del otro.</span></div>
     </div>
     <button class="btn green" id="go">${INVITE ? "Entrar a la sala" : "Jugar"}</button>
   `);
