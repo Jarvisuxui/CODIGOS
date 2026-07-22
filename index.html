@@ -574,7 +574,7 @@ function fallbackCopy(txt){
 }
 
 // ================= MQTT =================
-function topics(room){ return { presence: TOPIC_ROOT + "/" + room + "/p/", events: TOPIC_ROOT + "/" + room + "/e" }; }
+function topics(room){ return { presence: TOPIC_ROOT + "/" + room + "/p/", events: TOPIC_ROOT + "/" + room + "/e", result: TOPIC_ROOT + "/" + room + "/r/" }; }
 function connect(room, onReady){
   if(typeof mqtt === "undefined"){ console.warn("MQTT no disponible"); return; }
   const t = topics(room);
@@ -592,6 +592,7 @@ function connect(room, onReady){
     S.connected = true;
     client.subscribe(t.presence + "+", {qos:0});
     client.subscribe(t.events, {qos:0});
+    client.subscribe(t.result + S.cid, {qos:0});   // canal privado de resultados (modo individual)
     publishPresence();
     if(firstConnect){ firstConnect=false; onReady && onReady(); }
     refreshStatus();
@@ -639,6 +640,12 @@ function handleMessage(topic, msg, t){
     let e; try{ e=JSON.parse(msg); }catch(err){ return; }
     if(e.cid === S.cid) return;
     onEvent(e);
+    return;
+  }
+  if(topic.startsWith(t.result)){
+    if(!msg) return;
+    let d; try{ d=JSON.parse(msg); }catch(err){ return; }
+    if(S.mode==="teams" && typeof onPrivateResult==="function") onPrivateResult(d);
   }
 }
 
@@ -1386,12 +1393,14 @@ function tmEnsureStyles(){
   document.head.appendChild(st);
 }
 
-function tmInit(isHost){
+function tmInit(isHost, kind){
   S.mode="teams"; S.role = isHost?"host":"guest"; S.tm = {
-    isHost, myTeam:null, roster:{}, joinOrder:[],
+    kind: kind||"teams", isHost, myTeam:null, roster:{}, joinOrder:[],
     gphase:"lobby", boards:{A:[],B:[]}, order:{A:[],B:[]}, idx:{A:0,B:0},
     clocks:{A:TEAM_CLOCK,B:TEAM_CLOCK}, secrets:{A:null,B:null},
-    turnTeam:null, turnCid:null, winner:null, winReason:null, sent:false, _sig:""
+    turnTeam:null, turnCid:null, winner:null, winReason:null, sent:false, _sig:"",
+    // --- individual (todos contra el código) ---
+    secret:null, board:[], best:0, finished:false, lb:{}, clock:0, winnerName:null
   };
   // El anfitrión se añade a sí mismo (no recibe su propia presencia).
   S.tm.roster[S.cid] = { name:S.name, team:null, present:true };
@@ -1401,11 +1410,18 @@ function tmInit(isHost){
 function tmPublishPresence(){
   if(!S.client || !S.connected) return;
   const t = topics(S.room);
-  S.client.publish(t.presence + S.cid, JSON.stringify({ name:S.name, team:S.tm?S.tm.myTeam:null }), {qos:0, retain:true});
+  const payload = { name:S.name, team:S.tm?S.tm.myTeam:null };
+  if(S.tm && S.tm.isHost){ payload.host=true; payload.kind=S.tm.kind; }
+  S.client.publish(t.presence + S.cid, JSON.stringify(payload), {qos:0, retain:true});
+}
+function tmSendResult(cid, obj){                 // host -> jugador (canal privado)
+  if(!S.client || !S.connected) return;
+  const t = topics(S.room);
+  S.client.publish(t.result + cid, JSON.stringify(obj), {qos:0, retain:false});
 }
 function tmOnReady(){
   tmPublishPresence();
-  drawTmLobby();
+  drawLobbyByKind();
 }
 
 // ---- Menú / entrada ----
@@ -1413,19 +1429,26 @@ function showTeamsMenu(){
   S.phase="teams-menu";
   render(`
     <div class="logo-pop" style="text-align:center;margin-bottom:4px">${ICON('group',44,'#34C759')}</div>
-    <h2 class="phase-title">Equipos (3+)</h2>
-    <p class="phase-sub">Dos equipos, tablero compartido y reloj por equipo. Por turnos de relevo: cada uno pone un intento y pasa. ¡A deducir juntos y sin pausa!</p>
-    <button class="btn green" id="tcreate">${iconLabel('group','Crear sala de equipos')}</button>
+    <h2 class="phase-title">Jugar 3+ personas</h2>
+    <p class="phase-sub">Elige cómo competir. Todos desde su propio móvil, en la misma sala.</p>
+    <button class="btn green" id="tcreate">${iconLabel('group','Por equipos (2 bandos)')}</button>
+    <button class="btn green" id="fcreate">${iconLabel('scope','Todos contra el código')}</button>
     <button class="btn secondary" id="tjoin">${iconLabel('key','Unirme con un código')}</button>
     <button class="btn secondary" id="back">Volver</button>
   `);
   document.getElementById("tcreate").onclick=()=>{ unlockAudio(); tmCreateRoom(); };
+  document.getElementById("fcreate").onclick=()=>{ unlockAudio(); ffaCreateRoom(); };
   document.getElementById("tjoin").onclick=()=>{ unlockAudio(); tmJoinScreen(); };
   document.getElementById("back").onclick=()=> showRoom();
 }
 function tmCreateRoom(){
-  tmInit(true); S.room=randCode();
+  tmInit(true,'teams'); S.room=randCode();
   drawTmLobby();
+  connect(S.room, tmOnReady);
+}
+function ffaCreateRoom(){
+  tmInit(true,'ffa'); S.room=randCode();
+  drawFfaLobby();
   connect(S.room, tmOnReady);
 }
 function tmJoinScreen(){
@@ -1460,11 +1483,14 @@ function tmOnPresence(who, msg){
     let d; try{ d=JSON.parse(msg); }catch(e){ return; }
     if(!S.tm.roster[who]) S.tm.joinOrder.push(who);
     S.tm.roster[who] = { name:d.name||"Jugador", team:d.team||null, present:true };
+    // Un invitado descubre el tipo de sala por la presencia del anfitrión.
+    if(!S.tm.isHost && d.host && d.kind && S.tm.kind!==d.kind){ S.tm.kind = d.kind; }
   }
-  if(S.tm.gphase==="lobby") drawTmLobby();
+  if(S.tm.gphase==="lobby") drawLobbyByKind();
   else if(S.tm.isHost && S.tm.gphase==="play") tmBroadcast();  // re-sincroniza a quien reingrese
   refreshStatus();
 }
+function drawLobbyByKind(){ if(S.tm.kind==="ffa") drawFfaLobby(); else drawTmLobby(); }
 function tmName(cid){ const r=S.tm.roster[cid]; return r? r.name : "Jugador"; }
 function tmTeamOf(cid){ const r=S.tm.roster[cid]; return r? r.team : null; }
 function tmTeamCids(team){ return S.tm.joinOrder.filter(c=> S.tm.roster[c] && S.tm.roster[c].present && S.tm.roster[c].team===team); }
@@ -1594,6 +1620,12 @@ function onTeamEvent(e){
   if(e.t==="tm_state"){ tmApplySnapshot(e); }
   else if(e.t==="tm_guess"){ if(S.tm.isHost) tmHostProcessGuess(e.cid, e.value); }
   else if(e.t==="tm_rematch"){ if(S.tm.isHost && S.tm.gphase==="end") tmHostStart(); }
+  else if(e.t==="ffa_state"){ ffaApplySnapshot(e); }
+  else if(e.t==="ffa_guess"){ if(S.tm.isHost) ffaHostProcessGuess(e.cid, e.value); }
+}
+function onPrivateResult(d){
+  if(!S.tm || S.tm.kind!=="ffa") return;
+  if(d.t==="ffa_res") ffaOnResult(d);
 }
 function tmApplySnapshot(snap){
   const tm=S.tm;
@@ -1692,6 +1724,240 @@ function drawTmEnd(){
   `);
   refreshStatus();
   const ag=document.getElementById("again"); if(ag) ag.onclick=()=>tmHostStart();
+  document.getElementById("menu").onclick=leaveToMenu;
+}
+
+// ======================================================================
+// ============ MODO INDIVIDUAL: TODOS CONTRA EL CÓDIGO =================
+// Un único código oculto. Todos juegan A LA VEZ (sin turnos), cada uno
+// con su tablero PRIVADO (para que nadie copie deducciones ajenas). En
+// común: un marcador en vivo (intentos y mejor acierto de cada uno) y un
+// reloj global. Gana quien clava los 4 dígitos primero; si se acaba el
+// tiempo, gana quien esté más cerca. El anfitrión evalúa (código nunca
+// viaja a los móviles hasta el final).
+// ======================================================================
+const FFA_CLOCK = 180000;   // 3:00 global
+
+function ffaEnsureStyles(){
+  if(document.getElementById('ffa-styles')) return;
+  const st=document.createElement('style'); st.id='ffa-styles';
+  st.textContent = `
+  .ffa-clkwrap{display:flex;justify-content:center;margin-bottom:8px;}
+  .ffa-clk{background:var(--fill);border-radius:16px;padding:8px 22px;text-align:center;}
+  .ffa-clk .tt{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--label);}
+  .ffa-clk.low .tt{color:var(--red);}
+  .ffa-clk .lab{font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--label3);}
+  .ffa-lb{margin-top:12px;background:var(--fill);border-radius:16px;padding:8px 10px;}
+  .ffa-lb h4{margin:0 0 6px;font-size:12px;color:var(--label3);letter-spacing:.4px;}
+  .ffa-lbrow{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--sep);font-size:13.5px;}
+  .ffa-lbrow:last-child{border-bottom:none;}
+  .ffa-lbrow .rk{width:18px;font-weight:800;color:var(--label3);text-align:center;flex:none;}
+  .ffa-lbrow .nm{flex:1;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .ffa-lbrow.me .nm{color:var(--accent);}
+  .ffa-lbrow .best{font-weight:800;font-variant-numeric:tabular-nums;}
+  .ffa-lbrow .att{font-size:11.5px;color:var(--label3);min-width:52px;text-align:right;}
+  .ffa-lbrow .crown{color:#ffb800;}
+  .ffa-myboard{margin-top:10px;}
+  .ffa-myboard h4{margin:0 0 4px;font-size:12.5px;color:var(--label2);}
+  `;
+  document.head.appendChild(st);
+}
+
+// ---- Lobby ----
+function drawFfaLobby(){
+  S.phase="ffa-lobby"; S.tm.gphase="lobby"; ffaEnsureStyles();
+  const players=S.tm.joinOrder.filter(c=>S.tm.roster[c]&&S.tm.roster[c].present);
+  const n=players.length;
+  const canStart = n>=2;
+  const list = players.map(c=>`<div class="chip${c===S.cid?' me':''}">${tmName(c)}${c===S.cid?'<span class="yo">tú</span>':''}</div>`).join("");
+  const ctrl = S.tm.isHost
+    ? `<button class="btn green" id="start" ${canStart?'':'disabled style="opacity:.45"'}>${iconLabel('scope','¡Empezar carrera!')}</button>
+       ${canStart?'':`<p class="hint" style="text-align:center">Hacen falta al menos 2 jugadores (mejor 3+).</p>`}`
+    : `<p class="hint" style="text-align:center">Esperando a que el anfitrión empiece…</p>`;
+  render(`
+    <div class="logo-pop" style="text-align:center;margin-bottom:2px">${ICON('scope',40,'#34C759')}</div>
+    <h2 class="phase-title">Todos contra el código</h2>
+    <p class="phase-sub">Un código oculto, todos a la vez. El primero que lo descifra gana.</p>
+    <div class="codebox"><div class="lab">Código de sala</div><div class="code">${S.room}</div></div>
+    <button class="btn secondary" id="share">${iconLabel('share','Invitar')}</button>
+    <div style="margin:12px 0">${list||'<div class="empty">Nadie aún…</div>'}
+      <div class="tm-unassigned">${n} jugador${n===1?'':'es'} en la sala</div></div>
+    ${ctrl}
+    ${statusBar()}
+    <button class="btn secondary" id="leave">Salir</button>
+  `);
+  document.getElementById("share").onclick=()=>ffaShare();
+  const sb=document.getElementById("start"); if(sb) sb.onclick=()=>{ if(canStart) ffaHostStart(); };
+  document.getElementById("leave").onclick=leaveToMenu;
+  refreshStatus();
+}
+async function ffaShare(){
+  const url = location.origin + location.pathname;
+  const text = `🎯 Sala de CÓDIGOS: todos contra el código, el primero que lo descifra gana. Entra en "Jugar 3+ personas" → "Unirme con un código" y pon: ${S.room}`;
+  try{ if(navigator.share){ await navigator.share({title:"CÓDIGOS", text, url}); return; } }catch(e){ if(e&&e.name==="AbortError") return; }
+  try{ window.open("https://wa.me/?text="+encodeURIComponent(text+" "+url), "_blank"); }catch(e){ copyText(S.room); }
+}
+
+// ---- Anfitrión ----
+function ffaPlayers(){ return S.tm.joinOrder.filter(c=>S.tm.roster[c]&&S.tm.roster[c].present); }
+function ffaHostStart(){
+  const tm=S.tm; const players=ffaPlayers();
+  if(players.length<2) return;
+  tm.secret=randomValidGuess();
+  tm.lb={}; players.forEach(c=> tm.lb[c]={attempts:0,best:0,finished:false});
+  tm.clock=FFA_CLOCK; tm.winner=null; tm.winnerName=null; tm.winReason=null; tm.gphase="play";
+  tm.board=[]; tm.best=0; tm.finished=false; tm.waiting=false;
+  S.phase="ffaplay";
+  ffaBroadcast();
+  drawFfaPlay();
+  ffaStartHostClock();
+}
+function ffaSnapshot(){
+  const tm=S.tm;
+  return { t:"ffa_state", ph:tm.gphase, lb:tm.lb, clock:Math.round(tm.clock),
+           winner:tm.winner, winnerName:tm.winnerName, winReason:tm.winReason,
+           secret: tm.gphase==="end" ? tm.secret : null };
+}
+function ffaBroadcast(){ if(S.tm && S.tm.isHost) sendEvent(ffaSnapshot()); }
+function ffaHostProcessGuess(cid, value){
+  const tm=S.tm;
+  if(!tm.isHost || tm.gphase!=="play" || tm.winner) return;
+  const rec=tm.lb[cid]; if(!rec || rec.finished) return;
+  if(!isValid(value)) return;
+  const hits=exactHits(value, tm.secret);
+  rec.attempts++; if(hits>rec.best) rec.best=hits;
+  const win = hits===4;
+  if(win){ rec.finished=true; tm.winner=cid; tm.winnerName=tmName(cid); tm.winReason="crack"; tm.gphase="end"; }
+  // resultado privado al jugador que intentó
+  if(cid===S.cid){ ffaApplyOwnResult(value, hits, win); }
+  else { tmSendResult(cid, { t:"ffa_res", g:value, h:hits, win }); }
+  ffaBroadcast();
+  if(win){ ffaStopHostClock(); ffaEnterEnd(); }
+  else if(tm.isHost && S.phase==="ffaplay"){ ffaRenderLb(); }
+}
+function ffaStartHostClock(){ ffaStopHostClock(); S._tmLast=performance.now(); S._tmBcast=0; S._tmInt=setInterval(ffaHostClockTick,250); }
+function ffaStopHostClock(){ if(S._tmInt){ clearInterval(S._tmInt); S._tmInt=null; } }
+function ffaLeaderCid(){
+  const tm=S.tm; let best=null, brec=null;
+  for(const c of ffaPlayers()){ const r=tm.lb[c]; if(!r) continue;
+    if(!brec || r.best>brec.best || (r.best===brec.best && r.attempts<brec.attempts)){ best=c; brec=r; } }
+  return best;
+}
+function ffaHostClockTick(){
+  const tm=S.tm; if(!tm || !tm.isHost || tm.gphase!=="play"){ return; }
+  const now=performance.now(); const dt=now-(S._tmLast||now); S._tmLast=now;
+  tm.clock-=dt;
+  if(tm.clock<=0){
+    tm.clock=0; const lc=ffaLeaderCid();
+    tm.winner=lc; tm.winnerName=lc?tmName(lc):null; tm.winReason="timeout"; tm.gphase="end";
+    ffaStopHostClock(); ffaBroadcast(); ffaEnterEnd(); return;
+  }
+  if(now-(S._tmBcast||0) > 320){ S._tmBcast=now; ffaBroadcast(); }
+  ffaRenderClock();
+}
+
+// ---- Cliente: snapshots y resultado privado ----
+function ffaApplySnapshot(snap){
+  const tm=S.tm;
+  tm.lb=snap.lb||tm.lb; tm.clock=(snap.clock!=null?snap.clock:tm.clock);
+  tm.winner=snap.winner; tm.winnerName=snap.winnerName; tm.winReason=snap.winReason; tm.gphase=snap.ph;
+  if(snap.secret) tm.secret=snap.secret;
+  if(snap.ph==="play"){
+    if(S.phase!=="ffaplay"){ S.phase="ffaplay"; drawFfaPlay(); }
+    else { ffaRenderClock(); ffaRenderLb(); }
+  } else if(snap.ph==="end"){
+    if(S.phase!=="ffaend"){ S.phase="ffaend"; drawFfaEnd(); }
+  }
+}
+function ffaOnResult(d){ ffaApplyOwnResult(d.g, d.h, !!d.win); }
+function ffaApplyOwnResult(value, hits, win){
+  const tm=S.tm;
+  tm.board.push({ g:value, h:hits }); if(hits>tm.best) tm.best=hits;
+  if(win) tm.finished=true;
+  tm.waiting=false;
+  ffaRenderMyBoard();
+  const msg=document.getElementById("ffa-msg"); if(msg) msg.textContent="";
+}
+
+// ---- Juego ----
+function ffaRenderClock(){
+  const el=document.getElementById("ffa-clk-t"); if(!el) return;
+  el.textContent=fmtClock(S.tm.clock);
+  el.parentElement.classList.toggle('low', S.tm.clock<20000);
+}
+function ffaLbHtml(){
+  const tm=S.tm;
+  const rows=ffaPlayers().map(c=>({c, r:tm.lb[c]||{attempts:0,best:0,finished:false}}));
+  rows.sort((x,y)=> (y.r.best-x.r.best) || (x.r.attempts-y.r.attempts));
+  return rows.map((o,i)=>`<div class="ffa-lbrow${o.c===S.cid?' me':''}">
+    <span class="rk">${o.r.finished?'<span class="crown">'+'★'+'</span>':(i+1)}</span>
+    <span class="nm">${tmName(o.c)}${o.c===S.cid?' (tú)':''}</span>
+    <span class="best">${o.r.best}/4</span>
+    <span class="att">${o.r.attempts} int.</span>
+  </div>`).join("");
+}
+function ffaRenderLb(){ const el=document.getElementById("ffa-lb-body"); if(el) el.innerHTML=ffaLbHtml(); }
+function ffaMyBoardHtml(){
+  const b=S.tm.board;
+  if(!b.length) return `<div class="empty">Aún no has probado.</div>`;
+  return b.slice().reverse().map(h=>`<div class="hrow"><span class="g">${h.g}</span><span class="hits">aciertos <span class="pill ${h.h===4?'win':(h.h===0?'zero':'')}">${h.h}/4</span></span></div>`).join("");
+}
+function ffaRenderMyBoard(){ const el=document.getElementById("ffa-myboard-body"); if(el) el.innerHTML=ffaMyBoardHtml(); }
+function drawFfaPlay(){
+  S.phase="ffaplay"; ffaEnsureStyles();
+  render(`
+    <div class="ffa-clkwrap"><div class="ffa-clk" id="ffa-clk"><div class="lab">TIEMPO</div><div class="tt" id="ffa-clk-t">${fmtClock(S.tm.clock)}</div></div></div>
+    <p class="tm-turn" style="text-align:center">¡Descifra el código oculto antes que nadie!</p>
+    ${digitsRow(S.buffer)}
+    <p class="msg" id="ffa-msg"></p>
+    ${keypad()}
+    <div class="ffa-myboard"><h4>Tus intentos</h4><div id="ffa-myboard-body">${ffaMyBoardHtml()}</div></div>
+    <div class="ffa-lb"><h4>MARCADOR EN VIVO</h4><div id="ffa-lb-body">${ffaLbHtml()}</div></div>
+    ${statusBar()}
+    <button class="btn secondary" id="leave" style="margin-top:10px">Salir</button>
+  `);
+  refreshStatus(); ffaRenderClock();
+  document.getElementById("leave").onclick=leaveToMenu;
+  bindKeypad(paintDigits, ffaSubmitGuess);
+}
+function ffaSubmitGuess(){
+  const msg=document.getElementById("ffa-msg");
+  if(S.tm.finished || S.tm.gphase!=="play"){ return; }
+  if(S.tm.waiting){ return; }
+  if(S.buffer.length<4){ if(msg) msg.textContent="Faltan dígitos."; return; }
+  if(!isValid(S.buffer)){ if(msg) msg.textContent="Los 4 dígitos deben ser distintos."; return; }
+  const value=S.buffer; S.buffer=""; paintDigits();
+  if(S.tm.isHost){ ffaHostProcessGuess(S.cid, value); }
+  else { S.tm.waiting=true; if(msg) msg.textContent="Comprobando…"; sendEvent({ t:"ffa_guess", value }); }
+}
+
+// ---- Fin ----
+function ffaEnterEnd(){ S.phase="ffaend"; drawFfaEnd(); if(S.tm.winner===S.cid) confetti(); }
+function drawFfaEnd(){
+  const tm=S.tm; const iWon = tm.winner===S.cid;
+  const wname = tm.winnerName || (tm.winner?tmName(tm.winner):"Nadie");
+  const big = iWon ? "¡Ganaste!" : `Ganó ${wname}`;
+  const sub = tm.winReason==="timeout"
+    ? `Se acabó el tiempo. ${wname} fue quien más se acercó.`
+    : `${iWon?'Descifraste':(wname+' descifró')} el código oculto primero.`;
+  const reveal = tm.secret ? `<div class="reveal">El código era: <b>${tm.secret}</b></div>` : "";
+  const ctrl = tm.isHost
+    ? `<button class="btn gold" id="again">Otra ronda</button>`
+    : `<p class="hint" style="text-align:center">El anfitrión puede empezar otra ronda.</p>`;
+  render(`
+    <div class="end">
+      <div class="emoji">${iWon?ICON('trophy',64,'#ffb800'):ICON('scope',64,'#8e8e93')}</div>
+      <div class="big ${iWon?'win':'lose'}">${big}</div>
+      <p class="phase-sub">${sub}</p>
+      ${reveal}
+      <div class="ffa-lb" style="text-align:left"><h4>RESULTADO</h4><div id="ffa-lb-body">${ffaLbHtml()}</div></div>
+      ${ctrl}
+      <button class="btn secondary" id="menu">Salir</button>
+    </div>
+    ${statusBar()}
+  `);
+  refreshStatus();
+  const ag=document.getElementById("again"); if(ag) ag.onclick=()=>ffaHostStart();
   document.getElementById("menu").onclick=leaveToMenu;
 }
 
