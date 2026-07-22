@@ -628,6 +628,7 @@ function handleMessage(topic, msg, t){
   if(topic.startsWith(t.presence)){
     const who = topic.slice(t.presence.length);
     if(who === S.cid) return;
+    if(S.mode==="teams"){ tmOnPresence(who, msg); return; }
     if(!msg){ if(S.opp.present){ S.opp.present=false; S.opp.ready=false; onOppLeft(); } return; }
     let d; try{ d=JSON.parse(msg); }catch(e){ return; }
     S.opp.name = d.name || "Rival"; S.opp.ready = !!d.ready; S.opp.present = true; S.oppEverPresent = true;
@@ -657,6 +658,7 @@ function onPresenceUpdate(){
 // NO le sacamos de la partida: mantenemos el estado y solo mostramos "reconectando".
 function onOppLeft(){ refreshStatus(); }
 function onEvent(e){
+  if(S.mode==="teams"){ return onTeamEvent(e); }
   if(e.t === "guess"){
     const hits = exactHits(e.value, S.secret);
     const win = hits === 4;
@@ -703,6 +705,7 @@ function ICON(name, size, color){
     shield:`<path d="M12 3.2l7.4 2.9v5c0 5-3.2 7.2-7.4 8.5-4.2-1.3-7.4-3.5-7.4-8.5v-5z"/><path d="M8.9 12l2.2 2.2 4.2-4.4"/>`,
     target:`<circle cx="12" cy="12" r="8.8"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1.2" fill="${color}" stroke="none"/>`,
     scope:`<circle cx="12" cy="12" r="7.92" stroke-width="1.99"/><g stroke-width="2.64"><path d="M17.94 6.06l2.8-2.8"/><path d="M6.06 6.06l-2.8-2.8"/><path d="M17.94 17.94l2.8 2.8"/><path d="M6.06 17.94l-2.8 2.8"/></g><circle cx="12" cy="12" r="3.96" stroke-width="1.75"/><circle cx="12" cy="12" r="1.97" fill="${color}" stroke="none"/>`,
+    group:`<circle cx="12" cy="7" r="2.6"/><circle cx="5.4" cy="9.4" r="2.2"/><circle cx="18.6" cy="9.4" r="2.2"/><path d="M7.6 18.4v-.5a4.4 4.4 0 0 1 8.8 0v.5z"/><path d="M2.2 17.2v-.3a3.4 3.4 0 0 1 4.6-2.6"/><path d="M21.8 17.2v-.3a3.4 3.4 0 0 0-4.6-2.6"/>`,
     check:`<path d="M4.5 12.6l5 5L19.5 6.8"/>`,
     back:`<path d="M10 5.2h7.6a2.7 2.7 0 0 1 2.7 2.7v8.2a2.7 2.7 0 0 1-2.7 2.7H10a2.7 2.7 0 0 1-2.1-1l-3.2-3.9a2.7 2.7 0 0 1 0-3.4l3.2-3.9a2.7 2.7 0 0 1 2.1-1z"/><path d="M12.7 9.7l4.6 4.6M17.3 9.7l-4.6 4.6"/>`,
     share:`<circle cx="18" cy="5.4" r="2.8"/><circle cx="6" cy="12" r="2.8"/><circle cx="18" cy="18.6" r="2.8"/><path d="M8.5 10.7l7-4M8.5 13.3l7 4"/>`,
@@ -920,11 +923,13 @@ function showRoom(){
     <p class="phase-sub">Partida rápida contra el mundo, reta a un amigo, o juega contra el bot.</p>
     <button class="btn green" id="quick">${iconLabel('globe','Partida rápida')}</button>
     <button class="btn secondary" id="create">${iconLabel('people','Retar a un amigo')}</button>
+    <button class="btn secondary" id="teams">${iconLabel('group','Equipos (3+)')}</button>
     <button class="btn secondary" id="join">${iconLabel('key','Unirme con un código')}</button>
     <button class="btn secondary" id="bot">${iconLabel('robot','Jugar contra un bot')}</button>
   `);
   document.getElementById("quick").onclick=()=>{ unlockAudio(); quickMatch(); };
   document.getElementById("create").onclick=()=>{ unlockAudio(); createRoom(); };
+  document.getElementById("teams").onclick=()=>{ unlockAudio(); showTeamsMenu(); };
   document.getElementById("join").onclick=()=>{ unlockAudio(); joinScreen(); };
   document.getElementById("bot").onclick=()=>{ unlockAudio(); showBotSetup(); };
 }
@@ -1201,7 +1206,7 @@ function showInfo(title, sub){
 }
 
 function leaveToMenu(){
-  stopClock(); stopGlobeSpin();
+  stopClock(); stopGlobeSpin(); tmStopHostClock();
   try{ if(S.mm) S.mm.cancel(); }catch(e){}
   closeLobby();
   try{ clearPresence(); }catch(e){}
@@ -1209,7 +1214,7 @@ function leaveToMenu(){
   S.client=null; S.connected=false; S.role=null; S.room=null; S.secret=null;
   S.buffer=""; S.guesses=[]; S.ready=false; S.opp={name:null,ready:false,present:false};
   S.waitingResult=false; S.myTurn=false; S.oppLastGuess=null;
-  S.mode=null; S.bot=null; S.quick=false; S.mm=null;
+  S.mode=null; S.bot=null; S.quick=false; S.mm=null; S.tm=null;
   showRoom();
 }
 
@@ -1330,6 +1335,365 @@ function applyBgPattern(){
   }catch(e){}
 }
 applyBgPattern();
+
+// ======================================================================
+// ================= MODO EQUIPOS (3+ jugadores) ========================
+// Anfitrión-autoridad: quien crea la sala evalúa intentos, lleva los dos
+// relojes y reparte turnos por relevo. Los demás mandan su intento y ven
+// el estado que difunde el anfitrión. Las cifras nunca viajan a los
+// clientes hasta el final (no se pueden "espiar" desde el navegador).
+// ======================================================================
+const TEAM_CLOCK = 180000;   // 3:00 por equipo
+const TEAM_COLOR = { A:'#34C759', B:'#0A84FF' };
+
+function tmEnsureStyles(){
+  if(document.getElementById('tm-styles')) return;
+  const st=document.createElement('style'); st.id='tm-styles';
+  st.textContent = `
+  .teams-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0;}
+  .teamcol{background:var(--fill);border-radius:18px;padding:14px 12px;border:2px solid transparent;}
+  .teamcol.A{border-color:rgba(52,199,89,.35);} .teamcol.B{border-color:rgba(10,132,255,.32);}
+  .teamcol h3{margin:0 0 8px;font-size:15px;display:flex;align-items:center;gap:7px;}
+  .teamcol .dotc{width:11px;height:11px;border-radius:50%;flex:none;}
+  .teamcol.A .dotc{background:${TEAM_COLOR.A};} .teamcol.B .dotc{background:${TEAM_COLOR.B};}
+  .chip{background:#fff;border-radius:11px;padding:7px 10px;margin-bottom:6px;font-size:14px;font-weight:600;color:var(--label);display:flex;align-items:center;gap:6px;box-shadow:0 1px 2px rgba(0,0,0,.05);}
+  .chip.me{outline:2px solid var(--accent);}
+  .chip .yo{font-size:11px;color:var(--label3);font-weight:700;margin-left:auto;}
+  .teamcol .empty{font-size:12.5px;color:var(--label3);padding:4px 2px;}
+  .teamcol .jbtn{width:100%;margin-top:6px;border:none;border-radius:11px;padding:9px;font-weight:700;font-size:13.5px;color:#fff;cursor:pointer;}
+  .teamcol.A .jbtn{background:${TEAM_COLOR.A};} .teamcol.B .jbtn{background:${TEAM_COLOR.B};}
+  .teamcol .jbtn.on{opacity:.45;}
+  .tm-unassigned{font-size:12.5px;color:var(--label3);text-align:center;margin:2px 0 6px;}
+  .tm-clocks{display:flex;gap:10px;align-items:stretch;margin-bottom:12px;}
+  .tm-clk{flex:1;background:var(--fill);border-radius:16px;padding:9px 6px;text-align:center;border:2px solid transparent;transition:border-color .15s,background .15s;}
+  .tm-clk.A.act{border-color:${TEAM_COLOR.A};background:#eafbef;}
+  .tm-clk.B.act{border-color:${TEAM_COLOR.B};background:#e8f2ff;}
+  .tm-clk .nm{font-size:12px;font-weight:800;letter-spacing:.4px;}
+  .tm-clk.A .nm{color:${TEAM_COLOR.A};} .tm-clk.B .nm{color:${TEAM_COLOR.B};}
+  .tm-clk .tt{font-size:23px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--label);}
+  .tm-clk.low .tt{color:var(--red);}
+  .tm-turn{text-align:center;font-size:14px;margin:2px 0 8px;color:var(--label2);}
+  .tm-turn b{color:var(--label);}
+  .tm-boards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;}
+  .tm-board h4{margin:0 0 6px;font-size:12.5px;display:flex;align-items:center;gap:6px;}
+  .tm-board.A h4{color:${TEAM_COLOR.A};} .tm-board.B h4{color:${TEAM_COLOR.B};}
+  .tm-row{display:flex;align-items:center;gap:6px;font-size:13px;padding:4px 0;border-bottom:1px solid var(--sep);}
+  .tm-row .who{color:var(--label3);font-size:11px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;}
+  .tm-row .gg{font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:1px;}
+  .tm-row .hh{font-weight:800;font-size:12px;}
+  .tm-board .empty{font-size:12px;color:var(--label3);padding:4px 0;}
+  `;
+  document.head.appendChild(st);
+}
+
+function tmInit(isHost){
+  S.mode="teams"; S.role = isHost?"host":"guest"; S.tm = {
+    isHost, myTeam:null, roster:{}, joinOrder:[],
+    gphase:"lobby", boards:{A:[],B:[]}, order:{A:[],B:[]}, idx:{A:0,B:0},
+    clocks:{A:TEAM_CLOCK,B:TEAM_CLOCK}, secrets:{A:null,B:null},
+    turnTeam:null, turnCid:null, winner:null, winReason:null, sent:false, _sig:""
+  };
+  // El anfitrión se añade a sí mismo (no recibe su propia presencia).
+  S.tm.roster[S.cid] = { name:S.name, team:null, present:true };
+  S.tm.joinOrder = [S.cid];
+  tmEnsureStyles();
+}
+function tmPublishPresence(){
+  if(!S.client || !S.connected) return;
+  const t = topics(S.room);
+  S.client.publish(t.presence + S.cid, JSON.stringify({ name:S.name, team:S.tm?S.tm.myTeam:null }), {qos:0, retain:true});
+}
+function tmOnReady(){
+  tmPublishPresence();
+  drawTmLobby();
+}
+
+// ---- Menú / entrada ----
+function showTeamsMenu(){
+  S.phase="teams-menu";
+  render(`
+    <div class="logo-pop" style="text-align:center;margin-bottom:4px">${ICON('group',44,'#34C759')}</div>
+    <h2 class="phase-title">Equipos (3+)</h2>
+    <p class="phase-sub">Dos equipos, tablero compartido y reloj por equipo. Por turnos de relevo: cada uno pone un intento y pasa. ¡A deducir juntos y sin pausa!</p>
+    <button class="btn green" id="tcreate">${iconLabel('group','Crear sala de equipos')}</button>
+    <button class="btn secondary" id="tjoin">${iconLabel('key','Unirme con un código')}</button>
+    <button class="btn secondary" id="back">Volver</button>
+  `);
+  document.getElementById("tcreate").onclick=()=>{ unlockAudio(); tmCreateRoom(); };
+  document.getElementById("tjoin").onclick=()=>{ unlockAudio(); tmJoinScreen(); };
+  document.getElementById("back").onclick=()=> showRoom();
+}
+function tmCreateRoom(){
+  tmInit(true); S.room=randCode();
+  drawTmLobby();
+  connect(S.room, tmOnReady);
+}
+function tmJoinScreen(){
+  S.phase="teams-join";
+  render(`
+    <h2 class="phase-title">Unirme a una sala de equipos</h2>
+    <p class="phase-sub">Escribe el código que te pasó el anfitrión.</p>
+    <input class="field code-in" id="cd" maxlength="4" autocapitalize="characters" autocomplete="off" placeholder="CÓDIGO" style="text-transform:uppercase;text-align:center;letter-spacing:6px;font-weight:800;">
+    <button class="btn" id="go">Entrar</button>
+    <button class="btn secondary" id="back">Volver</button>
+  `);
+  const cd=document.getElementById("cd"); cd.focus();
+  document.getElementById("go").onclick=()=>{
+    const code=(cd.value||"").toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,4);
+    if(code.length<4){ return; }
+    tmJoinRoom(code);
+  };
+  document.getElementById("back").onclick=()=> showTeamsMenu();
+}
+function tmJoinRoom(code){
+  tmInit(false); S.room=code;
+  render(`<div class="handoff"><div class="icon">${ICON('signal',52,'#34C759')}</div><p class="phase-sub">Entrando a la sala ${code}…</p></div>`);
+  connect(S.room, tmOnReady);
+}
+
+// ---- Presencia / roster ----
+function tmOnPresence(who, msg){
+  if(!S.tm) return;
+  if(!msg){
+    if(S.tm.roster[who]) S.tm.roster[who].present=false;
+  } else {
+    let d; try{ d=JSON.parse(msg); }catch(e){ return; }
+    if(!S.tm.roster[who]) S.tm.joinOrder.push(who);
+    S.tm.roster[who] = { name:d.name||"Jugador", team:d.team||null, present:true };
+  }
+  if(S.tm.gphase==="lobby") drawTmLobby();
+  else if(S.tm.isHost && S.tm.gphase==="play") tmBroadcast();  // re-sincroniza a quien reingrese
+  refreshStatus();
+}
+function tmName(cid){ const r=S.tm.roster[cid]; return r? r.name : "Jugador"; }
+function tmTeamOf(cid){ const r=S.tm.roster[cid]; return r? r.team : null; }
+function tmTeamCids(team){ return S.tm.joinOrder.filter(c=> S.tm.roster[c] && S.tm.roster[c].present && S.tm.roster[c].team===team); }
+function tmCounts(){ return { A:tmTeamCids('A').length, B:tmTeamCids('B').length, un:S.tm.joinOrder.filter(c=>S.tm.roster[c]&&S.tm.roster[c].present&&!S.tm.roster[c].team).length }; }
+
+// ---- Lobby ----
+function tmChooseTeam(team){
+  S.tm.myTeam = (S.tm.myTeam===team) ? null : team;
+  S.tm.roster[S.cid].team = S.tm.myTeam;
+  tmPublishPresence();
+  drawTmLobby();
+}
+function tmMembersHtml(team){
+  const cids=tmTeamCids(team);
+  if(!cids.length) return `<div class="empty">Vacío</div>`;
+  return cids.map(c=>`<div class="chip${c===S.cid?' me':''}">${tmName(c)}${c===S.cid?'<span class="yo">tú</span>':''}</div>`).join("");
+}
+function drawTmLobby(){
+  S.phase="teams-lobby"; S.tm.gphase="lobby";
+  const c=tmCounts();
+  const canStart = c.A>=1 && c.B>=1 && (c.A+c.B)>=3;
+  const startBtn = S.tm.isHost
+    ? `<button class="btn green" id="start" ${canStart?'':'disabled style="opacity:.45"'}>${iconLabel('scope','Empezar duelo')}</button>
+       ${canStart?'':`<p class="hint" style="text-align:center">Hacen falta al menos 1 en cada equipo y 3 en total.</p>`}`
+    : `<p class="hint" style="text-align:center">Esperando a que el anfitrión empiece…</p>`;
+  render(`
+    <h2 class="phase-title">Sala de equipos</h2>
+    <p class="phase-sub">Elige tu equipo. Cuando estéis listos, el anfitrión empieza.</p>
+    <div class="codebox"><div class="lab">Código de sala</div><div class="code">${S.room}</div></div>
+    <button class="btn secondary" id="share">${iconLabel('share','Invitar')}</button>
+    <div class="teams-grid">
+      <div class="teamcol A">
+        <h3><span class="dotc"></span>Equipo A <span style="margin-left:auto;font-size:12px;color:var(--label3)">${c.A}</span></h3>
+        ${tmMembersHtml('A')}
+        <button class="jbtn ${S.tm.myTeam==='A'?'on':''}" id="joinA">${S.tm.myTeam==='A'?'Salir':'Unirme a A'}</button>
+      </div>
+      <div class="teamcol B">
+        <h3><span class="dotc"></span>Equipo B <span style="margin-left:auto;font-size:12px;color:var(--label3)">${c.B}</span></h3>
+        ${tmMembersHtml('B')}
+        <button class="jbtn ${S.tm.myTeam==='B'?'on':''}" id="joinB">${S.tm.myTeam==='B'?'Salir':'Unirme a B'}</button>
+      </div>
+    </div>
+    ${c.un?`<div class="tm-unassigned">${c.un} sin equipo</div>`:''}
+    ${startBtn}
+    ${statusBar()}
+    <button class="btn secondary" id="leave">Salir</button>
+  `);
+  document.getElementById("share").onclick=()=>tmShare();
+  document.getElementById("joinA").onclick=()=>tmChooseTeam('A');
+  document.getElementById("joinB").onclick=()=>tmChooseTeam('B');
+  const sb=document.getElementById("start"); if(sb) sb.onclick=()=>{ if(canStart) tmHostStart(); };
+  document.getElementById("leave").onclick=leaveToMenu;
+  refreshStatus();
+}
+async function tmShare(){
+  const url = location.origin + location.pathname;
+  const text = `🎯 Únete a mi sala de EQUIPOS en CÓDIGOS. Entra en "Equipos (3+)" → "Unirme con un código" y pon: ${S.room}`;
+  try{ if(navigator.share){ await navigator.share({title:"CÓDIGOS", text, url}); return; } }catch(e){ if(e&&e.name==="AbortError") return; }
+  try{ window.open("https://wa.me/?text="+encodeURIComponent(text+" "+url), "_blank"); }catch(e){ copyText(S.room); }
+}
+
+// ---- Snapshot / difusión ----
+function tmSnapshot(){
+  const tm=S.tm;
+  return { t:"tm_state", ph:tm.gphase, boards:tm.boards, turnTeam:tm.turnTeam, turnCid:tm.turnCid,
+           clocks:{A:Math.round(tm.clocks.A),B:Math.round(tm.clocks.B)}, order:tm.order,
+           winner:tm.winner, winReason:tm.winReason,
+           secrets: tm.gphase==="end" ? tm.secrets : null };
+}
+function tmBroadcast(){ if(S.tm && S.tm.isHost) sendEvent(tmSnapshot()); }
+
+// ---- Anfitrión: arranque, evaluación, relojes ----
+function tmHostStart(){
+  const tm=S.tm;
+  const A=tmTeamCids('A'), B=tmTeamCids('B');
+  if(A.length<1 || B.length<1 || (A.length+B.length)<3) return;
+  tm.order={A:A, B:B}; tm.idx={A:0,B:0};
+  tm.secrets={A:randomValidGuess(), B:randomValidGuess()};
+  tm.boards={A:[],B:[]}; tm.clocks={A:TEAM_CLOCK,B:TEAM_CLOCK};
+  tm.turnTeam='A'; tm.turnCid=tm.order.A[0];
+  tm.winner=null; tm.winReason=null; tm.gphase="play"; tm.sent=false;
+  S.phase="tmplay";
+  tmBroadcast();
+  drawTmPlay();
+  tmStartHostClock();
+}
+function tmHostProcessGuess(cid, value){
+  const tm=S.tm;
+  if(!tm.isHost || tm.gphase!=="play") return;
+  if(cid!==tm.turnCid) return;              // no es su turno
+  if(!isValid(value)) return;
+  const team=tmTeamOf(cid); if(team!=='A'&&team!=='B') return;
+  const target = team==='A' ? tm.secrets.B : tm.secrets.A;
+  const hits = exactHits(value, target);
+  tm.boards[team].push({ by:tmName(cid), g:value, h:hits });
+  if(hits===4){
+    tm.winner=team; tm.winReason="crack"; tm.gphase="end";
+    tmStopHostClock(); tmBroadcast(); tmEnterEnd(); return;
+  }
+  if(hits>0) tm.clocks[team] = Math.min(TEAM_CLOCK*2, tm.clocks[team] + hits*BONUS_MS);
+  // relevo: avanza el índice del equipo que jugó y pasa al otro equipo
+  tm.idx[team] = tm.idx[team] + 1;
+  const nt = team==='A' ? 'B' : 'A';
+  tm.turnTeam = nt;
+  tm.turnCid = tm.order[nt][ tm.idx[nt] % tm.order[nt].length ];
+  tmBroadcast();
+  drawTmPlay();
+}
+function tmStartHostClock(){ tmStopHostClock(); S._tmLast=performance.now(); S._tmBcast=0; S._tmInt=setInterval(tmHostClockTick, 250); }
+function tmStopHostClock(){ if(S._tmInt){ clearInterval(S._tmInt); S._tmInt=null; } }
+function tmHostClockTick(){
+  const tm=S.tm; if(!tm || !tm.isHost || tm.gphase!=="play"){ return; }
+  const now=performance.now(); const dt=now-(S._tmLast||now); S._tmLast=now;
+  tm.clocks[tm.turnTeam] -= dt;
+  if(tm.clocks[tm.turnTeam] <= 0){
+    tm.clocks[tm.turnTeam]=0;
+    tm.winner = tm.turnTeam==='A' ? 'B' : 'A'; tm.winReason="timeout"; tm.gphase="end";
+    tmStopHostClock(); tmBroadcast(); tmEnterEnd(); return;
+  }
+  if(now-(S._tmBcast||0) > 320){ S._tmBcast=now; tmBroadcast(); }
+  tmUpdateClockUI();
+}
+
+// ---- Eventos entrantes ----
+function onTeamEvent(e){
+  if(!S.tm) return;
+  if(e.t==="tm_state"){ tmApplySnapshot(e); }
+  else if(e.t==="tm_guess"){ if(S.tm.isHost) tmHostProcessGuess(e.cid, e.value); }
+  else if(e.t==="tm_rematch"){ if(S.tm.isHost && S.tm.gphase==="end") tmHostStart(); }
+}
+function tmApplySnapshot(snap){
+  const tm=S.tm;
+  tm.boards=snap.boards||{A:[],B:[]}; tm.turnTeam=snap.turnTeam; tm.turnCid=snap.turnCid;
+  tm.clocks=snap.clocks||tm.clocks; tm.order=snap.order||tm.order;
+  tm.winner=snap.winner; tm.winReason=snap.winReason; tm.gphase=snap.ph;
+  if(snap.secrets) tm.secrets=snap.secrets;
+  if(snap.ph==="play"){
+    const sig = tm.turnCid+"|"+(tm.boards.A.length)+"|"+(tm.boards.B.length);
+    if(S.phase!=="tmplay" || sig!==tm._sig){ tm._sig=sig; tm.sent=false; S.phase="tmplay"; drawTmPlay(); }
+    else tmUpdateClockUI();
+  } else if(snap.ph==="end"){
+    if(S.phase!=="tmend"){ S.phase="tmend"; drawTmEnd(); }
+  }
+}
+
+// ---- Juego (pantalla compartida) ----
+function tmClocksHtml(){
+  const tm=S.tm, act=tm.turnTeam;
+  const low=(t)=> tm.clocks[t]<20000?' low':'';
+  return `<div class="tm-clocks">
+    <div class="tm-clk A ${act==='A'?'act':''}${low('A')}"><div class="nm">EQUIPO A</div><div class="tt" id="tm-clk-A">${fmtClock(tm.clocks.A)}</div></div>
+    <div class="tm-clk B ${act==='B'?'act':''}${low('B')}"><div class="nm">EQUIPO B</div><div class="tt" id="tm-clk-B">${fmtClock(tm.clocks.B)}</div></div>
+  </div>`;
+}
+function tmBoardHtml(team){
+  const rows=S.tm.boards[team];
+  const inner = !rows.length ? `<div class="empty">Sin intentos aún</div>`
+    : rows.slice().reverse().map(r=>`<div class="tm-row"><span class="who">${r.by}</span><span class="gg">${r.g}</span><span class="hh" style="color:${r.h===4?'#34C759':(r.h===0?'#8e8e93':'#ff9f0a')}">${r.h}/4</span></div>`).join("");
+  return `<div class="tm-board ${team}"><h4>Equipo ${team} descifra</h4>${inner}</div>`;
+}
+function tmUpdateClockUI(){
+  const tm=S.tm; if(!tm) return;
+  const a=document.getElementById("tm-clk-A"), b=document.getElementById("tm-clk-B");
+  if(a){ a.textContent=fmtClock(tm.clocks.A); const p=a.parentElement; p.classList.toggle('act',tm.turnTeam==='A'); p.classList.toggle('low',tm.clocks.A<20000); }
+  if(b){ b.textContent=fmtClock(tm.clocks.B); const p=b.parentElement; p.classList.toggle('act',tm.turnTeam==='B'); p.classList.toggle('low',tm.clocks.B<20000); }
+}
+function drawTmPlay(){
+  const tm=S.tm;
+  const myTurn = (tm.turnCid===S.cid) && !tm.sent;
+  const turnName = tmName(tm.turnCid);
+  let center;
+  if(myTurn){
+    center = `<p class="tm-turn">Tu turno · descifra el código del <b>Equipo ${tm.turnTeam==='A'?'B':'A'}</b></p>
+      ${digitsRow(S.buffer)}<p class="msg" id="msg"></p>${keypad()}`;
+  } else if(tm.sent && tm.turnCid===S.cid){
+    center = `<div class="handoff"><div class="icon">${ICON('signal',48,'#34C759')}</div><p class="phase-sub">Enviando tu intento…</p></div>`;
+  } else {
+    const mine = tm.myTeam===tm.turnTeam;
+    center = `<p class="tm-turn">Turno del <b>Equipo ${tm.turnTeam}</b> · le toca a <b>${turnName}</b>${mine?' (tu equipo)':''}</p>
+      <div class="handoff" style="padding:10px 0"><div class="icon">${ICON('clock',44,'#8e8e93')}</div><p class="phase-sub" style="margin:0">${mine?'Ayúdale: mirad juntos el tablero.':'Observa y prepara la siguiente pista.'}</p></div>`;
+  }
+  render(`
+    ${tmClocksHtml()}
+    ${center}
+    <div class="tm-boards">${tmBoardHtml('A')}${tmBoardHtml('B')}</div>
+    ${statusBar()}
+    <button class="btn secondary" id="leave" style="margin-top:10px">Salir</button>
+  `);
+  refreshStatus(); tmUpdateClockUI();
+  document.getElementById("leave").onclick=leaveToMenu;
+  if(myTurn) bindKeypad(paintDigits, tmSubmitGuess);
+}
+function tmSubmitGuess(){
+  const msg=document.getElementById("msg");
+  if(S.buffer.length<4){ if(msg) msg.textContent="Faltan dígitos."; return; }
+  if(!isValid(S.buffer)){ if(msg) msg.textContent="Los 4 dígitos deben ser distintos."; return; }
+  const value=S.buffer; S.buffer="";
+  S.tm.sent=true;
+  if(S.tm.isHost){ tmHostProcessGuess(S.cid, value); }
+  else { sendEvent({ t:"tm_guess", value }); drawTmPlay(); }
+}
+
+// ---- Fin ----
+function tmEnterEnd(){ S.phase="tmend"; drawTmEnd(); if(S.tm.myTeam && S.tm.winner===S.tm.myTeam) confetti(); }
+function drawTmEnd(){
+  const tm=S.tm; const win=tm.winner; const iWon = tm.myTeam && tm.myTeam===win;
+  const reason = tm.winReason==="timeout"
+    ? `Al Equipo ${win==='A'?'B':'A'} se le acabó el tiempo.`
+    : `El Equipo ${win} descifró el código rival primero.`;
+  const reveal = (tm.secrets&&tm.secrets.A&&tm.secrets.B)
+    ? `<div class="reveal">Código de A: <b>${tm.secrets.A}</b> · Código de B: <b>${tm.secrets.B}</b></div>` : "";
+  const ctrl = tm.isHost
+    ? `<button class="btn gold" id="again">Nueva partida</button>`
+    : `<p class="hint" style="text-align:center">El anfitrión puede empezar otra.</p>`;
+  render(`
+    <div class="end">
+      <div class="emoji">${ICON('trophy',64, win?TEAM_COLOR[win]:'#ffb800')}</div>
+      <div class="big ${iWon?'win':'lose'}">${iWon?'¡Ganó tu equipo!':('Ganó el Equipo '+win)}</div>
+      <p class="phase-sub">${reason}</p>
+      ${reveal}
+      ${ctrl}
+      <button class="btn secondary" id="menu">Salir</button>
+    </div>
+    ${statusBar()}
+  `);
+  refreshStatus();
+  const ag=document.getElementById("again"); if(ag) ag.onclick=()=>tmHostStart();
+  document.getElementById("menu").onclick=leaveToMenu;
+}
 
 showWelcome();
 </script>
